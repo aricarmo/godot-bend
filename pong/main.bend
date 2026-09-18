@@ -10,6 +10,7 @@ import ../godot/api/ColorRect.bend as ColorRect
 import ../godot/api/Label.bend as Label
 import ../godot/api/Input.bend as Input
 import ../godot/api/RenderingServer.bend as RenderingServer
+import ../godot/api/Global.bend as Global
 
 # Rules
 # =====
@@ -111,7 +112,7 @@ def label(+me: Godot.Object) -> IO(Godot.Object):
     Node.add_child(me, l)
     return l
 
-# Either of two keys, by Godot's keycodes.
+# Either of two keys.
 def key(+input: Godot.Object, a: U32, b: U32) -> IO(Bool):
   do IO<Bool>:
     x : Bool <- Input.is_key_pressed(input, a)
@@ -176,8 +177,8 @@ def loop(+sc: Scene, +ly: F32, +ry: F32, +b: Ball, ls: U32, rs: U32) -> IO(Unit)
   do IO<Unit>:
     raw : F32 <- Godot.frame()
     +dt : F32 = F32.min(raw, 0.05)
-    up : Bool <- key(Scene.input(sc), 87, 4194320)
-    down : Bool <- key(Scene.input(sc), 83, 4194322)
+    up : Bool <- key(Scene.input(sc), Global.KEY_W(), Global.KEY_UP())
+    down : Bool <- key(Scene.input(sc), Global.KEY_S(), Global.KEY_DOWN())
     play(sc, paddle(ly, axis(up, down), dt), chase(ry, Ball.y(b), dt),
       Ball.step(b, dt, ly, ry), ls, rs,
       s => l => r => n => p => q => loop(s, l, r, n, p, q))

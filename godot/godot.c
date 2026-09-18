@@ -38,6 +38,9 @@ static GDExtensionInterfaceObjectGetInstanceFromId      gd_obj_at;
 static GDExtensionInterfaceGlobalGetSingleton           gd_global;
 static GDExtensionInterfaceCallableCustomCreate2        gd_callable;
 static GDExtensionInterfaceRefGetObject                 gd_ref_obj;
+static GDExtensionInterfaceClassdbGetMethodBind         gd_bind;
+static GDExtensionInterfaceObjectMethodBindCall         gd_bind_call;
+static GDExtensionInterfaceVariantGetPtrUtilityFunction gd_util;
 static GDExtensionPtrDestructor                         gd_str_free;
 static GDExtensionPtrDestructor                         gd_sn_free;
 static GDExtensionPtrDestructor                         gd_call_free;
@@ -577,6 +580,116 @@ Term gd_call_run(Env e, Term* f, IoWork* w) {
   return GD_UNIT;
 }
 
+// gd.static calls a class's static method: the arguments are the top argc
+// values, and the result replaces them, as in gd.call. The hash is the
+// method's, from extension_api.json, which is how Godot finds the bind.
+Term gd_static_run(Env e, Term* f, IoWork* w) {
+  uint64_t cn = 0;
+  uint64_t mn = 0;
+  char*  cls    = io_cstr(e, f[0], &cn);
+  char*  method = io_cstr(e, f[1], &mn);
+  u32    argc   = (u32)f[3];
+  if (argc > gd_sp) {
+    err_fail("godot: a call with more arguments than the stack holds");
+  }
+  GdVar* args = gd_stack + (gd_sp - argc);
+  GdVar  ret;
+  GdName cname;
+  GdName mname;
+  gd_sn_utf8(&cname, cls, (GDExtensionInt)cn);
+  gd_sn_utf8(&mname, method, (GDExtensionInt)mn);
+  GDExtensionMethodBindPtr bind = gd_bind(&cname, &mname, (u32)f[2]);
+  if (bind == NULL) {
+    gd_error("no such static method: ", method);
+    gd_var_nil(&ret);
+  } else {
+    GDExtensionConstVariantPtr ptrs[argc + 1];
+    for (u32 i = 0; i < argc; i += 1) {
+      ptrs[i] = &args[i];
+    }
+    GDExtensionCallError err = { 0 };
+    gd_bind_call(bind, NULL, ptrs, argc, &ret, &err);
+    if (err.error != GDEXTENSION_CALL_OK) {
+      gd_error("a static call with bad arguments: ", method);
+    }
+  }
+  for (u32 i = 0; i < argc; i += 1) {
+    gd_var_free(&args[i]);
+  }
+  gd_sp -= argc;
+  *gd_push() = ret;
+  gd_sn_free(&mname);
+  gd_sn_free(&cname);
+  free(method);
+  free(cls);
+  return GD_UNIT;
+}
+
+// gd.util calls a utility function (randf, lerp, ..). Those have no call
+// by Variant, only one by typed pointers, so sig spells the types: a
+// letter per argument, '>', and the answer's, of f float, i int, b bool,
+// s String, v Variant, o Object and - nothing. The arguments are the top
+// values, and the result replaces them.
+Term gd_util_run(Env e, Term* f, IoWork* w) {
+  uint64_t nn = 0;
+  uint64_t sn = 0;
+  char* name = io_cstr(e, f[0], &nn);
+  char* sig  = io_cstr(e, f[2], &sn);
+  u32   argc = (u32)(strchr(sig, '>') - sig);
+  if (argc > gd_sp || argc > 8) {
+    err_fail("godot: a utility call the stack cannot serve");
+  }
+  GdName uname;
+  gd_sn_utf8(&uname, name, (GDExtensionInt)nn);
+  GDExtensionPtrUtilityFunction fn = gd_util(&uname, (u32)f[1]);
+  GdVar* args = gd_stack + (gd_sp - argc);
+  GdVar  ret;
+  gd_var_nil(&ret);
+  if (fn == NULL) {
+    gd_error("no such utility function: ", name);
+  } else {
+    union { double f; int64_t i; GDExtensionBool b; GdStr s; } at[8];
+    GDExtensionConstTypePtr ptrs[8];
+    for (u32 i = 0; i < argc; i += 1) {
+      ptrs[i] = &at[i];
+      switch (sig[i]) {
+        case 'f': gd_into[GD_FLOAT](&at[i].f, &args[i]); break;
+        case 'i': gd_into[GD_INT](&at[i].i, &args[i]);   break;
+        case 'b': gd_into[GD_BOOL](&at[i].b, &args[i]);  break;
+        case 's': gd_into[GD_STR](&at[i].s, &args[i]);   break;
+        default:  ptrs[i] = &args[i];                    break;
+      }
+    }
+    union { double f; int64_t i; GDExtensionBool b; GdStr s;
+      GDExtensionObjectPtr o; GdVar v; } out = { 0 };
+    char kind = sig[argc + 1];
+    fn(kind == '-' ? NULL : (void*)&out, ptrs, (int)argc);
+    switch (kind) {
+      case 'f': gd_from[GD_FLOAT](&ret, &out.f); break;
+      case 'i': gd_from[GD_INT](&ret, &out.i);   break;
+      case 'b': gd_from[GD_BOOL](&ret, &out.b);  break;
+      case 's': gd_from[GD_STR](&ret, &out.s); gd_str_free(&out.s); break;
+      case 'o': gd_from[GD_OBJ](&ret, &out.o);   break;
+      case 'v': ret = out.v;                     break;
+      default:                                   break;
+    }
+    for (u32 i = 0; i < argc; i += 1) {
+      if (sig[i] == 's') {
+        gd_str_free(&at[i].s);
+      }
+    }
+  }
+  for (u32 i = 0; i < argc; i += 1) {
+    gd_var_free(&args[i]);
+  }
+  gd_sp -= argc;
+  *gd_push() = ret;
+  gd_sn_free(&uname);
+  free(sig);
+  free(name);
+  return GD_UNIT;
+}
+
 // gd.kind, by Godot.bend's numbering; a null object counts as Nil, and a
 // StringName or a NodePath as the String it pops as.
 Term gd_kind_run(Env e, Term* f, IoWork* w) {
@@ -844,6 +957,12 @@ static void __attribute__((constructor)) gd_use(void) {
 #ifdef CID_GD_LISTEN
   io_eff(CID_GD_LISTEN, gd_listen_run, 0);
 #endif
+#ifdef CID_GD_STATIC
+  io_eff(CID_GD_STATIC, gd_static_run, 0);
+#endif
+#ifdef CID_GD_UTIL
+  io_eff(CID_GD_UTIL, gd_util_run, 0);
+#endif
 #ifdef CID_GD_CONNECT
   io_eff(CID_GD_CONNECT, gd_connect_run, 0);
 #endif
@@ -1064,6 +1183,10 @@ GDExtensionBool godot_bend_init(GDExtensionInterfaceGetProcAddress get,
     get("object_get_instance_from_id");
   gd_global       = (GDExtensionInterfaceGlobalGetSingleton)
     get("global_get_singleton");
+  gd_bind         = (GDExtensionInterfaceClassdbGetMethodBind)
+    get("classdb_get_method_bind");
+  gd_bind_call    = (GDExtensionInterfaceObjectMethodBindCall)
+    get("object_method_bind_call");
   gd_ref_obj      = (GDExtensionInterfaceRefGetObject)
     get("ref_get_object");
   gd_callable     = (GDExtensionInterfaceCallableCustomCreate2)
@@ -1089,7 +1212,7 @@ GDExtensionBool godot_bend_init(GDExtensionInterfaceGetProcAddress get,
   gd_n_ready   = gd_name("_ready");
   gd_n_process = gd_name("_process");
   gd_n_input   = gd_name("_input");
-  GDExtensionInterfaceVariantGetPtrUtilityFunction util =
+  GDExtensionInterfaceVariantGetPtrUtilityFunction util = gd_util =
     (GDExtensionInterfaceVariantGetPtrUtilityFunction)
     get("variant_get_ptr_utility_function");
   GdName print  = gd_name("print");

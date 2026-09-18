@@ -25,7 +25,7 @@ def main() -> IO(Unit):
 **Status: early, and working.** A Bend program compiles into a GDExtension
 library, Godot loads it, and the program runs frame by frame inside the
 engine. Every Godot class has a generated Bend file of typed methods
-(12,743 of them), over a dynamic core that calls any method by name, as
+(12,834 of them), over a dynamic core that calls any method by name, as
 GDScript's `obj.call(..)` does, and the program hears signals and input.
 There is a [Pong](pong/main.bend) written in it. Tested with Godot 4.6.3 on
 macOS arm64.
@@ -51,11 +51,16 @@ compiles only the defs a program reaches.
   the required ones, `Node.add_child.all(me, node, False{}, 0)` every one.
 - A vararg method takes the rest as a list:
   `Object.emit_signal(me, "hit", [Godot.VInt{1}])`.
+- A static method takes no object: `Image.create_empty(8, 4, False{}, Image.FORMAT_RGBA8())`.
+- [`Global.bend`](godot/api/Global.bend) holds what belongs to no class: the
+  global enums (`Global.KEY_W()`) and 98 utility functions
+  (`Global.randf_range(0.0, 1.0)`). Bend has its own F32 math, which is pure;
+  these are effects, worth it for what only the engine knows.
 
 A wrapper adds the types and nothing else; the call still goes by name
-through the dynamic core. 2,077 methods are left out for now, the ones with
-an argument that is a `RID`, a `Dictionary`, a transform or a packed array,
-as are static and virtual ones. Each file's header counts its own.
+through the dynamic core. About 2,100 methods are left out for now, the ones
+with an argument that is a `RID`, a `Dictionary`, a transform or a packed
+array, as are virtual ones. Each file's header counts its own.
 
 To regenerate, for another Godot version:
 
@@ -229,7 +234,7 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] `_input` events as values; GDScript into a running program, by signal
 - [x] `Godot.drop`, with generational handles
 - [x] Typed wrappers generated from `extension_api.json` over the dynamic core
-- [ ] Static methods, utility functions (`lerp`, `randf`, ..) and global enums (`KEY_W`)
+- [x] Static methods, utility functions (`lerp`, `randf`, ..) and global enums (`KEY_W`)
 - [ ] A non-blocking poll in the pump, so `IO.sleep`, sockets and channels
       work inside Godot
 - [ ] Linux, then Android and iOS; Windows when Bend supports it

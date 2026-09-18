@@ -95,3 +95,13 @@ function gd_events()                   { return 0n; }
 function gd_event()                    { return 0; }
 function gd_drop(slot)                 { return GD_UNIT; }
 function gd_listen(on)                 { return GD_UNIT; }
+
+function gd_static(cls, method, hash, argc) {
+  gd_stack.length -= Number(argc);
+  return gd_put(0n, null);
+}
+
+function gd_util(name, hash, sig) {
+  gd_stack.length -= sig.indexOf(">");
+  return gd_put(0n, null);
+}

@@ -15,6 +15,11 @@ the same stack, and a wrong receiver still answers the type's zero and an
 error in Godot's log. Objects stay one type, Godot.Object (Bend has no
 subtyping), so a Sprite2D takes Node2D.set_position as it is.
 
+A static method takes no object and goes by its hash (Godot.static), and
+Global.bend holds what belongs to no class: the global enums (KEY_W) and
+the utility functions (randf, lerp, ..), which go by hash and a spelling of
+their types (Godot.util).
+
 A method's trailing arguments with defaults are left to Godot: `name` takes
 the required ones, and `name.all` takes every one. A method with an argument
 of a kind the binding does not carry yet (RID, Dictionary, Transform2D, ..)
@@ -102,14 +107,23 @@ def def_body(caller, method, values, vararg):
             + pack(values, "    ", "])"))
 
 
-def method_defs(m, classes, used):
+def answer(rkind, action, indent="  "):
+    """A body that runs action, an IO(Variant), and reads it as rkind."""
+    if rkind is None:
+        return [indent + "Godot.done(" + action + ")"]
+    if rkind[2] == "call":
+        return [indent + action]
+    return [indent + "do IO<%s>:" % rkind[0],
+            indent + "  v : Godot.Variant <- " + action,
+            indent + "  return Godot.to_%s(v)" % rkind[2][5:]]
+
+
+def method_defs(m, classes, used, owner=""):
     """The defs of one method ([] when it cannot be carried) and a reason.
     used holds the file's def names: a method that meets one (GDScript has
     a method called new) gets a trailing underscore."""
     if m.get("is_virtual"):
         return [], "virtual"
-    if m.get("is_static"):
-        return [], "static"
     args = m.get("arguments", [])
     kinds = [kind(a["type"], classes) for a in args]
     if any(k is None for k in kinds):
@@ -130,7 +144,7 @@ def method_defs(m, classes, used):
     for name, count in variants:
         taken = set()
         names = [param(a["name"], taken) for a in args[:count]]
-        params = ["self: Godot.Object"] + [
+        params = ([] if m.get("is_static") else ["self: Godot.Object"]) + [
             "%s: %s" % (n, k[0]) for n, k in zip(names, kinds)]
         values = [k[1] % n for n, k in zip(names, kinds)]
         if m.get("is_vararg"):
@@ -138,7 +152,14 @@ def method_defs(m, classes, used):
         rtype = "IO(%s)" % rkind[0] if ret else "IO(Unit)"
         caller = "Godot." + (rkind[2] if ret else "run")
         out += def_head(name, params, rtype)
-        out += def_body(caller, m["name"], values, m.get("is_vararg"))
+        if m.get("is_static"):
+            items = "[" + ", ".join(values) + "]"
+            if m.get("is_vararg"):
+                items = "List.append(&2, Godot.Variant, %s, rest)" % items
+            out += answer(rkind if ret else None, 'Godot.static("%s", "%s", %d, %s)'
+                          % (owner, m["name"], m["hash"], items))
+        else:
+            out += def_body(caller, m["name"], values, m.get("is_vararg"))
         out += [""]
     return out, None
 
@@ -175,7 +196,7 @@ def class_file(c, classes, singletons):
             body += ["def %s() -> U32:" % k["name"], "  %d" % n, ""]
     count = 0
     for m in c.get("methods", []):
-        defs, why = method_defs(m, classes, seen)
+        defs, why = method_defs(m, classes, seen, name)
         if why:
             skipped[why] = skipped.get(why, 0) + 1
         else:
@@ -196,6 +217,53 @@ def class_file(c, classes, singletons):
     return "\n".join(lines + body).rstrip("\n") + "\n"
 
 
+SIG = {"float": "f", "int": "i", "bool": "b", "String": "s", "Variant": "v"}
+
+
+def global_file(api, classes):
+    """Global.bend: the global enums and the utility functions."""
+    body, seen, count, skipped = [], set(), 0, 0
+    for enum in api["global_enums"]:
+        body += ["# %s" % enum["name"], ""]
+        for v in enum["values"]:
+            n = u32(v["value"])
+            if n is not None and v["name"] not in seen:
+                seen.add(v["name"])
+                body += ["def %s() -> U32:" % v["name"], "  %d" % n, ""]
+    body += ["# Utility functions", ""]
+    for f in api["utility_functions"]:
+        args = f.get("arguments", [])
+        rtype = f.get("return_type")
+        rsig = "-" if rtype is None else "o" if rtype == "Object" else SIG.get(rtype)
+        if f.get("is_vararg") or rsig is None or any(a["type"] not in SIG for a in args):
+            skipped += 1
+            continue
+        count += 1
+        taken = set()
+        names = [param(a["name"], taken) for a in args]
+        kinds = [kind(a["type"], classes) for a in args]
+        rkind = kind(rtype, classes) if rtype else None
+        sig = "".join(SIG[a["type"]] for a in args) + ">" + rsig
+        name = f["name"]
+        while name in seen:
+            name += "_"
+        seen.add(name)
+        head = def_head(name, ["%s: %s" % (n, k[0]) for n, k in zip(names, kinds)],
+                        "IO(%s)" % rkind[0] if rkind else "IO(Unit)")
+        items = "[" + ", ".join(k[1] % n for n, k in zip(names, kinds)) + "]"
+        body += head + answer(rkind, 'Godot.util("%s", %d, "%s", %s)' % (
+            f["name"], f["hash"], sig, items)) + [""]
+    lines = ["# Global", "# ======", "",
+             "# What belongs to no class, generated by tools/gen_api.py from",
+             "# extension_api.json; edit the generator, not this file: the global",
+             "# enums, a def per value, and %d utility functions (%d left out: the" % (count, skipped),
+             "# vararg ones and those over a kind not carried yet). Bend has its own",
+             "# F32 math, which is pure; these are effects, and worth it for what",
+             "# only the engine knows, like its random numbers.",
+             "import Base", "import ../Godot.bend as Godot", ""]
+    return "\n".join(lines + body).rstrip("\n") + "\n"
+
+
 def main():
     if len(sys.argv) < 4:
         sys.exit(__doc__)
@@ -210,7 +278,9 @@ def main():
             sys.exit("no class named " + name)
         with open(os.path.join(out, name + ".bend"), "w") as f:
             f.write(class_file(classes[name], classes, singletons))
-    print("wrote %d files to %s" % (len(wanted), out))
+    with open(os.path.join(out, "Global.bend"), "w") as f:
+        f.write(global_file(api, classes))
+    print("wrote %d files to %s, and Global.bend" % (len(wanted), out))
     total = sum(len(classes[n].get("methods", [])) for n in wanted)
     kept = sum(1 for n in wanted for m in classes[n].get("methods", [])
                if method_defs(m, classes, set())[1] is None)

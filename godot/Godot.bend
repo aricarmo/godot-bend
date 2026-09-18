@@ -136,6 +136,18 @@ def gd.pop_obj() -> IO(U32):
   import "./godot.c"
   import "./godot.js"
 
+# A class's static method, by the hash extension_api.json gives it: pops
+# argc arguments and pushes the result.
+def gd.static(class: String, method: String, hash: U32, argc: U32) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
+# A utility function, by its hash. sig spells its types, which the C side
+# needs: a letter per argument, '>', and the answer's.
+def gd.util(name: String, hash: U32, sig: String) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
 def gd.drop(slot: U32) -> IO(Unit):
   import "./godot.c"
   import "./godot.js"
@@ -612,3 +624,28 @@ def call_list(obj: Object, method: String, args: List<&2, Variant>) ->
   do IO<List<&2, Variant>>:
     v : Variant <- call(obj, method, args)
     return to_list(v)
+
+# A static method of a class, and a utility function (randf, lerp, ..).
+# The generated files call these; the hash and sig come from
+# extension_api.json.
+def static(
+  class: String, method: String, hash: U32, args: List<&2, Variant>
+) -> IO(Variant):
+  do IO<Variant>:
+    n : U32 <- Variant.push_all(args, 0)
+    gd.static(class, method, hash, n)
+    Variant.pop()
+
+def util(
+  name: String, hash: U32, sig: String, args: List<&2, Variant>
+) -> IO(Variant):
+  do IO<Variant>:
+    n : U32 <- Variant.push_all(args, 0)
+    gd.util(name, hash, sig)
+    Variant.pop()
+
+# Drops an answer nobody reads.
+def done(m: IO(Variant)) -> IO(Unit):
+  do IO<Unit>:
+    gone : Variant <- m
+    return Unit{}
