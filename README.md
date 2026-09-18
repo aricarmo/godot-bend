@@ -6,26 +6,68 @@ the language with dependent types, proofs and automatic CPU/GPU parallelism.
 ```python
 import Base
 import ../godot/Godot.bend as Godot
+import ../godot/api/Node.bend as Node
+import ../godot/api/Node2D.bend as Node2D
+import ../godot/api/Sprite2D.bend as Sprite2D
+import ../godot/api/ResourceLoader.bend as ResourceLoader
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    +me : Godot.Object <- Godot.self()
-    loader : Godot.Object <- Godot.singleton("ResourceLoader")
-    texture : Godot.Variant <- Godot.call(loader, "load", [Godot.VStr{"res://icon.svg"}])
-    +sprite : Godot.Object <- Godot.new("Sprite2D")
-    Godot.set(sprite, "texture", texture)
-    added : Godot.Variant <- Godot.call(me, "add_child", [Godot.VObj{sprite}])
-    Godot.set(sprite, "position", Godot.VVec2{576.0, 324.0})
+    me : Godot.Object <- Godot.self()
+    loader : Godot.Object <- ResourceLoader.singleton()
+    texture : Godot.Object <- ResourceLoader.load(loader, "res://icon.svg")
+    +sprite : Godot.Object <- Sprite2D.new()
+    Sprite2D.set_texture(sprite, texture)
+    Node.add_child(me, sprite)
+    Node2D.set_position(sprite, Godot.Vec2{576.0, 324.0})
 ```
 
 **Status: early, and working.** A Bend program compiles into a GDExtension
 library, Godot loads it, and the program runs frame by frame inside the
-engine. It reaches the engine through a dynamic core: any method of any
-object by name, as GDScript's `obj.call(..)` does, and hears its signals.
-There is a [Pong](pong/main.bend) written in it. Typed wrappers and more
-value kinds are the roadmap below. Tested with Godot 4.6.3 on macOS arm64.
+engine. Every Godot class has a generated Bend file of typed methods
+(12,743 of them), over a dynamic core that calls any method by name, as
+GDScript's `obj.call(..)` does, and the program hears signals and input.
+There is a [Pong](pong/main.bend) written in it. Tested with Godot 4.6.3 on
+macOS arm64.
 
-## The API
+## The typed API
+
+[`godot/api`](godot/api) holds one file per Godot class, 1,023 of them,
+generated from the engine's `extension_api.json` by
+[`tools/gen_api.py`](tools/gen_api.py). Import the classes you use; Bend
+compiles only the defs a program reaches.
+
+- A method is a def that takes the object first:
+  `Node2D.set_position(sprite, Godot.Vec2{1.0, 2.0})`,
+  `Node.get_name(node) : IO(String)`. `bool`, `int`, `float`, strings,
+  `Vector2`, `Vector3`, `Color`, arrays, enums and objects are typed; an
+  answer of a kind not carried yet is a raw `Godot.Variant`.
+- Objects are one type, `Godot.Object`, since Bend has no subtyping. So an
+  inherited method is called from its own class's file, on any object:
+  `Node2D.set_position` takes a `Sprite2D` as it is.
+- `Sprite2D.new()` makes one; `Input.singleton()` finds one.
+- An enum value is a def: `Node.PROCESS_MODE_ALWAYS()`.
+- Arguments with defaults are left to Godot: `Node.add_child(me, node)` takes
+  the required ones, `Node.add_child.all(me, node, False{}, 0)` every one.
+- A vararg method takes the rest as a list:
+  `Object.emit_signal(me, "hit", [Godot.VInt{1}])`.
+
+A wrapper adds the types and nothing else; the call still goes by name
+through the dynamic core. 2,077 methods are left out for now, the ones with
+an argument that is a `RID`, a `Dictionary`, a transform or a packed array,
+as are static and virtual ones. Each file's header counts its own.
+
+To regenerate, for another Godot version:
+
+```sh
+godot --headless --dump-extension-api
+tools/gen_api.py extension_api.json godot/api --all
+```
+
+## The dynamic core
+
+What the typed files are written in, and what reaches anything they leave
+out:
 
 | | |
 |---|---|
@@ -162,7 +204,9 @@ and runs it outside the engine, on the JS twins of the effects
 
 | Path | What |
 |---|---|
-| `godot/Godot.bend` | The Bend side: the API a program imports |
+| `godot/Godot.bend` | The Bend side: the dynamic core, `Variant`, signals |
+| `godot/api/` | One generated file of typed methods per Godot class |
+| `tools/gen_api.py` | Generates `godot/api` from `extension_api.json` |
 | `godot/godot.c` | The host side: effects, the pump, `BendRuntime`, the entry point |
 | `godot/godot.js` | JS twins of the effects, for checking and running outside Godot |
 | `godot/gdextension_interface.h` | Godot's C API, dumped from 4.6.3 |
@@ -184,7 +228,8 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] A game: Pong
 - [x] `_input` events as values; GDScript into a running program, by signal
 - [x] `Godot.drop`, with generational handles
-- [ ] Typed wrappers generated from `extension_api.json` over the dynamic core
+- [x] Typed wrappers generated from `extension_api.json` over the dynamic core
+- [ ] Static methods, utility functions (`lerp`, `randf`, ..) and global enums (`KEY_W`)
 - [ ] A non-blocking poll in the pump, so `IO.sleep`, sockets and channels
       work inside Godot
 - [ ] Linux, then Android and iOS; Windows when Bend supports it

@@ -4,17 +4,18 @@
 # prints it, and after five it ends.
 import Base
 import ../godot/Godot.bend as Godot
+import ../godot/api/Node.bend as Node
+import ../godot/api/Node2D.bend as Node2D
+import ../godot/api/Sprite2D.bend as Sprite2D
+import ../godot/api/ResourceLoader.bend as ResourceLoader
 
-def show(v: Godot.Variant) -> String:
-  match v:
-    case Godot.VVec2{x, y}:
-      "(" ++ F32.show(x) ++ ", " ++ F32.show(y) ++ ")"
-    case other:
-      "?"
+def show(p: Godot.Vec2) -> String:
+  Godot.Vec2{x, y} = p
+  "(" ++ F32.show(x) ++ ", " ++ F32.show(y) ++ ")"
 
 def report(sprite: Godot.Object) -> IO(Unit):
   do IO<Unit>:
-    at : Godot.Variant <- Godot.get(sprite, "position")
+    at : Godot.Vec2 <- Node2D.get_position(sprite)
     Godot.print("sprite at " ++ show(at))
 
 # A frame's end: more says the second is still running, last that it is
@@ -42,10 +43,10 @@ def move(
   rest: Godot.Object -> F32 -> F32 -> U32 -> IO(Unit)
 ) -> IO(Unit):
   do IO<Unit>:
-    Godot.set(sprite, "position", Godot.VVec2{
+    Node2D.set_position(sprite, Godot.Vec2{
       (576.0 + 220.0 * F32.cos(time) : F32),
       (324.0 + 220.0 * F32.sin(time) : F32)})
-    Godot.set(sprite, "rotation", Godot.VFloat{time})
+    Node2D.set_rotation(sprite, time)
     step(F32.is_lt(tick, 1.0), U32.is_eq(secs, 4), sprite, time, tick, secs,
       rest)
 
@@ -60,9 +61,9 @@ def main() -> IO(Unit):
   do IO<Unit>:
     Godot.print("hello from Bend, inside Godot")
     +me : Godot.Object <- Godot.self()
-    loader : Godot.Object <- Godot.singleton("ResourceLoader")
-    texture : Godot.Variant <- Godot.call(loader, "load", [Godot.VStr{"res://icon.svg"}])
-    +sprite : Godot.Object <- Godot.new("Sprite2D")
-    Godot.set(sprite, "texture", texture)
-    added : Godot.Variant <- Godot.call(me, "add_child", [Godot.VObj{sprite}])
+    loader : Godot.Object <- ResourceLoader.singleton()
+    texture : Godot.Object <- ResourceLoader.load(loader, "res://icon.svg")
+    +sprite : Godot.Object <- Sprite2D.new()
+    Sprite2D.set_texture(sprite, texture)
+    Node.add_child(me, sprite)
     loop(sprite, 0.0, 0.0, 0)

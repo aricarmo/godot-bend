@@ -4,6 +4,12 @@
 # right one follows the ball.
 import Base
 import ../godot/Godot.bend as Godot
+import ../godot/api/Node.bend as Node
+import ../godot/api/Control.bend as Control
+import ../godot/api/ColorRect.bend as ColorRect
+import ../godot/api/Label.bend as Label
+import ../godot/api/Input.bend as Input
+import ../godot/api/RenderingServer.bend as RenderingServer
 
 # Rules
 # =====
@@ -87,40 +93,33 @@ type Scene is Data:
     ball: Godot.Object, score: Godot.Object}
 
 def rect(
-  +me: Godot.Object, x: F32, y: F32, w: F32, h: F32, ink: Godot.Variant
+  +me: Godot.Object, at: Godot.Vec2, size: Godot.Vec2, ink: Godot.Color
 ) -> IO(Godot.Object):
   do IO<Godot.Object>:
-    +r : Godot.Object <- Godot.new("ColorRect")
-    Godot.set(r, "color", ink)
-    Godot.set(r, "size", Godot.VVec2{w, h})
-    Godot.set(r, "position", Godot.VVec2{x, y})
-    added : Godot.Variant <- Godot.call(me, "add_child", [Godot.VObj{r}])
+    +r : Godot.Object <- ColorRect.new()
+    ColorRect.set_color(r, ink)
+    Control.set_size(r, size)
+    Control.set_position(r, at)
+    Node.add_child(me, r)
     return r
 
 def label(+me: Godot.Object) -> IO(Godot.Object):
   do IO<Godot.Object>:
-    +l : Godot.Object <- Godot.new("Label")
-    Godot.set(l, "position", Godot.VVec2{516.0, 24.0})
-    sized : Godot.Variant <- Godot.call(l, "add_theme_font_size_override", [Godot.VStr{"font_size"}, Godot.VInt{56}])
-    added : Godot.Variant <- Godot.call(me, "add_child", [Godot.VObj{l}])
+    +l : Godot.Object <- Label.new()
+    Control.set_position(l, Godot.Vec2{516.0, 24.0})
+    Control.add_theme_font_size_override(l, "font_size", 56)
+    Node.add_child(me, l)
     return l
-
-def truth(v: Godot.Variant) -> Bool:
-  match v:
-    case Godot.VBool{v}:
-      v
-    case other:
-      False{}
 
 # Either of two keys, by Godot's keycodes.
 def key(+input: Godot.Object, a: U32, b: U32) -> IO(Bool):
   do IO<Bool>:
-    x : Godot.Variant <- Godot.call(input, "is_key_pressed", [Godot.VInt{a}])
-    y : Godot.Variant <- Godot.call(input, "is_key_pressed", [Godot.VInt{b}])
-    return Bool.or(truth(x), truth(y))
+    x : Bool <- Input.is_key_pressed(input, a)
+    y : Bool <- Input.is_key_pressed(input, b)
+    return Bool.or(x, y)
 
 def place(node: Godot.Object, x: F32, y: F32) -> IO(Unit):
-  Godot.set(node, "position", Godot.VVec2{x, y})
+  Control.set_position(node, Godot.Vec2{x, y})
 
 def draw(sc: Scene, ly: F32, ry: F32, b: Ball) -> IO(Unit):
   Scene{input, left, right, ball, score} = sc
@@ -133,7 +132,7 @@ def draw(sc: Scene, ly: F32, ry: F32, b: Ball) -> IO(Unit):
 def tally(sc: Scene, +ls: U32, +rs: U32) -> IO(Unit):
   Scene{input, left, right, ball, score} = sc
   do IO<Unit>:
-    Godot.set(score, "text", Godot.VStr{U32.show(ls) ++ "   " ++ U32.show(rs)})
+    Label.set_text(score, U32.show(ls) ++ "   " ++ U32.show(rs))
     Godot.print("score " ++ U32.show(ls) ++ " x " ++ U32.show(rs))
 
 def Scene.input(sc: Scene) -> Godot.Object:
@@ -186,12 +185,12 @@ def loop(+sc: Scene, +ly: F32, +ry: F32, +b: Ball, ls: U32, rs: U32) -> IO(Unit)
 def main() -> IO(Unit):
   do IO<Unit>:
     +me : Godot.Object <- Godot.self()
-    input : Godot.Object <- Godot.singleton("Input")
-    server : Godot.Object <- Godot.singleton("RenderingServer")
-    cleared : Godot.Variant <- Godot.call(server, "set_default_clear_color", [Godot.VColor{0.07, 0.08, 0.11, 1.0}])
-    left : Godot.Object <- rect(me, 32.0, 276.0, 16.0, 96.0, Godot.VColor{0.49, 0.88, 0.63, 1.0})
-    right : Godot.Object <- rect(me, 1104.0, 276.0, 16.0, 96.0, Godot.VColor{0.96, 0.55, 0.45, 1.0})
-    ball : Godot.Object <- rect(me, 568.0, 316.0, 16.0, 16.0, Godot.VColor{0.95, 0.95, 0.9, 1.0})
+    input : Godot.Object <- Input.singleton()
+    server : Godot.Object <- RenderingServer.singleton()
+    RenderingServer.set_default_clear_color(server, Godot.Rgba{0.07, 0.08, 0.11, 1.0})
+    left : Godot.Object <- rect(me, Godot.Vec2{32.0, 276.0}, Godot.Vec2{16.0, 96.0}, Godot.Rgba{0.49, 0.88, 0.63, 1.0})
+    right : Godot.Object <- rect(me, Godot.Vec2{1104.0, 276.0}, Godot.Vec2{16.0, 96.0}, Godot.Rgba{0.96, 0.55, 0.45, 1.0})
+    ball : Godot.Object <- rect(me, Godot.Vec2{568.0, 316.0}, Godot.Vec2{16.0, 16.0}, Godot.Rgba{0.95, 0.95, 0.9, 1.0})
     score : Godot.Object <- label(me)
     +sc : Scene = Scene{input, left, right, ball, score}
     tally(sc, 0, 0)

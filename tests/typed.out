@@ -1,0 +1,8 @@
+name: Hero
+position: 12.5 40
+process mode: 3
+parent: Bend
+children: 1
+ancestor: True
+heard: tag 5 with 2 values
+bend: done

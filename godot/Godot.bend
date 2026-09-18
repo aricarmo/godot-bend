@@ -463,3 +463,152 @@ def button_tag() -> U32:
 
 def motion_tag() -> U32:
   4294967293
+
+# Typed
+# -----
+
+# What the generated class files (godot/api) are written in: Bend types
+# for the engine's small values, a reading of a Variant as each type (the
+# type's zero when the Variant is of another kind), and a call per answer
+# type.
+type Vec2 is Data:
+  Vec2{x: F32, y: F32}
+
+type Vec3 is Data:
+  Vec3{x: F32, y: F32, z: F32}
+
+type Color is Data:
+  Rgba{r: F32, g: F32, b: F32, a: F32}
+
+def null() -> Object:
+  Obj{0}
+
+def vec2(p: Vec2) -> Variant:
+  Vec2{x, y} = p
+  VVec2{x, y}
+
+def vec3(p: Vec3) -> Variant:
+  Vec3{x, y, z} = p
+  VVec3{x, y, z}
+
+def color(c: Color) -> Variant:
+  Rgba{r, g, b, a} = c
+  VColor{r, g, b, a}
+
+def to_bool(v: Variant) -> Bool:
+  match v:
+    case VBool{v}:
+      v
+    case other:
+      False{}
+
+def to_int(v: Variant) -> U32:
+  match v:
+    case VInt{v}:
+      v
+    case VFloat{v}:
+      F32.to_u32(v)
+    case other:
+      0
+
+def to_float(v: Variant) -> F32:
+  match v:
+    case VFloat{v}:
+      v
+    case VInt{v}:
+      F32.from_nat(U32.to_nat(v))
+    case other:
+      0.0
+
+def to_str(v: Variant) -> String:
+  match v:
+    case VStr{v}:
+      v
+    case other:
+      ""
+
+def to_vec2(v: Variant) -> Vec2:
+  match v:
+    case VVec2{x, y}:
+      Vec2{x, y}
+    case other:
+      Vec2{0.0, 0.0}
+
+def to_vec3(v: Variant) -> Vec3:
+  match v:
+    case VVec3{x, y, z}:
+      Vec3{x, y, z}
+    case other:
+      Vec3{0.0, 0.0, 0.0}
+
+def to_color(v: Variant) -> Color:
+  match v:
+    case VColor{r, g, b, a}:
+      Rgba{r, g, b, a}
+    case other:
+      Rgba{0.0, 0.0, 0.0, 1.0}
+
+def to_obj(v: Variant) -> Object:
+  match v:
+    case VObj{v}:
+      v
+    case other:
+      Obj{0}
+
+def to_list(v: Variant) -> List<&2, Variant>:
+  match v:
+    case VArr{items}:
+      items
+    case other:
+      []
+
+def run(obj: Object, method: String, args: List<&2, Variant>) -> IO(Unit):
+  do IO<Unit>:
+    gone : Variant <- call(obj, method, args)
+    return Unit{}
+
+def call_bool(obj: Object, method: String, args: List<&2, Variant>) -> IO(Bool):
+  do IO<Bool>:
+    v : Variant <- call(obj, method, args)
+    return to_bool(v)
+
+def call_int(obj: Object, method: String, args: List<&2, Variant>) -> IO(U32):
+  do IO<U32>:
+    v : Variant <- call(obj, method, args)
+    return to_int(v)
+
+def call_float(obj: Object, method: String, args: List<&2, Variant>) -> IO(F32):
+  do IO<F32>:
+    v : Variant <- call(obj, method, args)
+    return to_float(v)
+
+def call_str(obj: Object, method: String, args: List<&2, Variant>) -> IO(String):
+  do IO<String>:
+    v : Variant <- call(obj, method, args)
+    return to_str(v)
+
+def call_vec2(obj: Object, method: String, args: List<&2, Variant>) -> IO(Vec2):
+  do IO<Vec2>:
+    v : Variant <- call(obj, method, args)
+    return to_vec2(v)
+
+def call_vec3(obj: Object, method: String, args: List<&2, Variant>) -> IO(Vec3):
+  do IO<Vec3>:
+    v : Variant <- call(obj, method, args)
+    return to_vec3(v)
+
+def call_color(obj: Object, method: String, args: List<&2, Variant>) -> IO(Color):
+  do IO<Color>:
+    v : Variant <- call(obj, method, args)
+    return to_color(v)
+
+def call_obj(obj: Object, method: String, args: List<&2, Variant>) -> IO(Object):
+  do IO<Object>:
+    v : Variant <- call(obj, method, args)
+    return to_obj(v)
+
+def call_list(obj: Object, method: String, args: List<&2, Variant>) ->
+  IO(List<&2, Variant>):
+  do IO<List<&2, Variant>>:
+    v : Variant <- call(obj, method, args)
+    return to_list(v)
