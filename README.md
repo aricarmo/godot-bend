@@ -53,7 +53,7 @@ compiles only the defs a program reaches.
   `Object.emit_signal(me, "hit", [Godot.VInt{1}])`.
 - A static method takes no object: `Image.create_empty(8, 4, False{}, Image.FORMAT_RGBA8())`.
 - [`Global.bend`](godot/api/Global.bend) holds what belongs to no class: the
-  global enums (`Global.KEY_W()`) and 98 utility functions
+  global enums (`Global.KEY_W()`) and 96 utility functions
   (`Global.randf_range(0.0, 1.0)`). Bend has its own F32 math, which is pure;
   these are effects, worth it for what only the engine knows.
 
@@ -147,6 +147,12 @@ it as that kind. Every raw effect then takes and answers only words, strings
 and numbers, so no Bend datatype's memory layout is part of the contract, and
 `Variant` itself is plain Bend code in `Godot.bend`.
 
+Bend's own waiting works too: `IO.sleep`, channels, `IO.fork`/`IO.join`, TCP
+and UDP. The runtime's poller sleeps until something is due, which Godot's
+thread cannot do, so each frame the pump asks the same questions with a zero
+timeout and wakes what came due. A program may wait on a socket and never
+call `Godot.frame()` at all.
+
 `Godot.frame()` is an effect that parks. The library registers a `BendRuntime`
 node: its `_ready` boots the Bend runtime and runs `main` until it parks on
 `frame`; its `_process(delta)` answers the parked `frame` with the delta and
@@ -235,7 +241,7 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] `Godot.drop`, with generational handles
 - [x] Typed wrappers generated from `extension_api.json` over the dynamic core
 - [x] Static methods, utility functions (`lerp`, `randf`, ..) and global enums (`KEY_W`)
-- [ ] A non-blocking poll in the pump, so `IO.sleep`, sockets and channels
+- [x] A non-blocking poll in the pump, so `IO.sleep`, sockets and channels
       work inside Godot
 - [ ] Linux, then Android and iOS; Windows when Bend supports it
 - [ ] Several Bend programs per scene (today: one `BendRuntime`, one `main`)
@@ -250,8 +256,10 @@ From how the Bend runtime is built today, and from what this binding has not don
 - Handles are released by hand (`Godot.drop`): nothing collects them.
 - Bend drops the effects a program never reaches, so `godot.c` registers each
   one under `#ifdef`; a new effect needs its line there.
-- The binding reaches into runtime internals (`io_step`, `io_runs`), so it is
-  tied to the pinned Bend commit and may need care on each bump.
+- The binding reaches into runtime internals (`io_step`, `io_runs`) and
+  carries a zero-timeout copy of the runtime's poller, so it is tied to the
+  pinned Bend commit and may need care on each bump.
+- A sleep or a socket wakes on the next frame, so its resolution is a frame.
 
 ## License
 

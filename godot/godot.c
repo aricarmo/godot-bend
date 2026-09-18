@@ -292,14 +292,72 @@ static bool   gd_up;        // the corpus is set and main is spawned
 static int    gd_code = -1; // main's exit code, once it halts
 static IoAct* gd_waiter;    // the activation parked on gd.frame
 
-// Runs every ready computation up to its next parked effect. The native
-// io_loop blocks in io_wait when the queue is empty; here an empty queue
-// hands the thread back to Godot.
+// io_wait without the wait: the runtime's own poller sleeps until a parked
+// computation is due (a sleep's time, a socket's readiness, a finished
+// blocking job), and Godot's thread cannot sleep. This asks the same
+// questions with a zero timeout and readies whatever is due now. It
+// follows io_wait line by line, so a Bend bump may need it looked at.
+static void gd_poll(Env e) {
+  struct pollfd* fds = io_mem(malloc((io_live + 1) * sizeof *fds));
+  u32 n = 1;
+  fds[0].fd     = io_wake_fd[0];
+  fds[0].events = POLLIN;
+  for (IoAct* a = io_park.head; a != NULL; a = a->next) {
+    if (a->time == 0) {
+      fds[n].fd     = (int)a->work.word;
+      fds[n].events = a->evts;
+      n += 1;
+    }
+  }
+  while (poll(fds, n, 0) < 0) {
+    if (errno != EINTR) {
+      err_fail("the poller failed");
+    }
+  }
+  if (fds[0].revents != 0) {
+    io_take(e);
+  }
+  u64   now  = io_tick();
+  u32   i    = 1;
+  IoQue todo = io_park;
+  io_park.head = NULL;
+  io_park.last = NULL;
+  while (todo.head != NULL) {
+    IoAct* a   = io_pop(&todo);
+    bool   due = a->time == 0 ? fds[i].revents != 0 : a->time <= now;
+    i += a->time == 0;
+    if (!due) {
+      io_push(&io_park, a);
+      continue;
+    }
+    Term x = a->work.pack(e, &a->work);
+    if (x != IO_PARK) {
+      a->item = x;
+      io_push(&io_runs, a);
+    }
+  }
+  free(fds);
+}
+
+// Runs every ready computation up to its next parked effect, then readies
+// the parked ones that came due and runs those. The native io_loop blocks
+// when nothing is ready; here that hands the thread back to Godot, and
+// the next frame asks again.
 static void gd_pump(void) {
   Env e = { CORPUS, ALC[0] };
-  while (gd_code < 0 && io_runs.head != NULL) {
-    gd_code = io_step(e, io_pop(&io_runs));
+  for (;;) {
+    while (gd_code < 0 && io_runs.head != NULL) {
+      gd_code = io_step(e, io_pop(&io_runs));
+    }
+    if (gd_code >= 0 || (io_park.head == NULL && io_busy == 0)) {
+      break;
+    }
+    gd_poll(e);
+    if (io_runs.head == NULL) {
+      break;
+    }
   }
+  io_sync();
 }
 
 static void gd_boot(void) {
@@ -1087,13 +1145,17 @@ static void gd_rt_call(GDExtensionClassInstancePtr self,
     }
     return;
   }
-  if (gd_waiter == NULL || gd_code >= 0) {
+  if (!gd_up || gd_code >= 0) {
     return;
   }
-  IoAct* a  = gd_waiter;
-  gd_waiter = NULL;
-  a->item   = f32_rewrap((f32)*(const double*)args[0]);
-  io_push(&io_runs, a);
+  // A frame: answer whoever waits on gd.frame, and pump either way, since
+  // a program may be parked on a sleep or a socket instead.
+  if (gd_waiter != NULL) {
+    IoAct* a  = gd_waiter;
+    gd_waiter = NULL;
+    a->item   = f32_rewrap((f32)*(const double*)args[0]);
+    io_push(&io_runs, a);
+  }
   gd_pump();
 }
 

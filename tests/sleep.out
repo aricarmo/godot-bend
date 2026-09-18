@@ -1,0 +1,6 @@
+main: sleeping
+main: awake
+main: took 3 frames meanwhile
+worker: slept
+main: the worker answered 42
+bend: done

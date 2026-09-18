@@ -17,7 +17,7 @@ for t in "$ROOT"/tests/*.bend; do
   # at shutdown (godotengine/godot#123511), after the import is done.
   sh -c '"$0" --path "$1" --headless --import >/dev/null 2>&1' \
     "$GODOT" "$WORK" 2>/dev/null || true
-  "$GODOT" --path "$WORK" --headless --quit-after 60 2>&1 \
+  "$GODOT" --path "$WORK" --headless --quit-after 200 2>&1 \
     | grep '[[:alnum:]]' | grep -v '^   at:\|^Godot Engine' > "$WORK/got" \
     || true
   if diff -u "${t%.bend}.out" "$WORK/got"; then
