@@ -28,7 +28,8 @@ engine. Every Godot class has a generated Bend file of typed methods
 (14,931 of them, every one that is not virtual but three), over a dynamic core that calls any method by name, as
 GDScript's `obj.call(..)` does, and the program hears signals and input.
 There is a [Pong](pong/main.bend) written in it. Tested with Godot 4.6.3 on
-macOS (arm64) and Linux (arm64 and, in CI, x86_64).
+macOS (arm64), Linux (arm64 and, in CI, x86_64) and Android (arm64, on the
+emulator).
 
 ## The typed API
 
@@ -217,6 +218,13 @@ godot --path pong
 Its rules are pure Bend functions over `F32`s; the IO loop reads the keys,
 steps the rules once per frame and moves four Godot nodes.
 
+For Android, `tools/build.sh demo/main.bend
+demo/bin/libgame.android.arm64.so android` cross-compiles with the NDK, and a
+normal Godot Android export then carries the library.
+`tools/android_run.sh tests/tcp.bend` does the whole trip for one program:
+builds it, exports a debug APK, runs it on the device or emulator `adb` sees,
+and prints its output.
+
 On Linux the library is a `.so`: `tools/build.sh demo/main.bend
 demo/bin/libgame.so`. `tools/linux.Dockerfile` runs the whole suite in a
 container, which is what CI does.
@@ -240,6 +248,7 @@ and runs it outside the engine, on the JS twins of the effects
 | `godot/gdextension_interface.h` | Godot's C API, dumped from 4.6.3 |
 | `tools/build.sh` | `.bend` → `.c` → shared library |
 | `tools/linux.Dockerfile` | The suite on Linux, in a container |
+| `tools/android_run.sh` | One program, built, exported and run on an Android device |
 | `demo/` | A Godot project that runs `demo/main.bend`: a sprite in orbit |
 | `pong/` | Pong: pure rules, a Godot scene built from Bend, keyboard input |
 | `tests/` | Programs run inside a headless Godot by `tools/test.sh` |
@@ -264,7 +273,8 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] A non-blocking poll in the pump, so `IO.sleep`, sockets and channels
       work inside Godot
 - [x] Linux
-- [ ] Android and iOS; Windows when Bend supports it
+- [x] Android (arm64)
+- [ ] iOS; Windows when Bend supports it
 - [ ] Several Bend programs per scene (today: one `BendRuntime`, one `main`)
 
 ## Known limits
