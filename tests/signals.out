@@ -1,0 +1,6 @@
+signal 7: 42 left
+signal 7: 43
+ERROR: In Object of type 'BendRuntime': Attempt to connect nonexistent signal 'no_such_signal' to callable '<CallableCustom>'.
+ERROR: bend: no signal to connect named no_such_signal
+signal 8:
+bend: done

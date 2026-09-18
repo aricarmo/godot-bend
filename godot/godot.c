@@ -35,8 +35,10 @@ static GDExtensionInterfaceObjectSetInstance            gd_set_instance;
 static GDExtensionInterfaceObjectGetInstanceId          gd_obj_id;
 static GDExtensionInterfaceObjectGetInstanceFromId      gd_obj_at;
 static GDExtensionInterfaceGlobalGetSingleton           gd_global;
+static GDExtensionInterfaceCallableCustomCreate2        gd_callable;
 static GDExtensionPtrDestructor                         gd_str_free;
 static GDExtensionPtrDestructor                         gd_sn_free;
+static GDExtensionPtrDestructor                         gd_call_free;
 static GDExtensionPtrUtilityFunction                    gd_util_print;
 static GDExtensionPtrUtilityFunction                    gd_util_error;
 
@@ -46,15 +48,19 @@ typedef struct { void* p; }  GdName;
 typedef struct { void* p; }  GdStr;
 typedef struct { u64 w[3]; } GdVar;
 typedef struct { f32 x, y; } GdVec2;
+typedef struct { u64 w[2]; } GdCall;
 
 // The kinds this binding carries, and Godot's constructors between each
 // and a Variant.
-enum { GD_BOOL, GD_INT, GD_FLOAT, GD_STR, GD_VEC2, GD_OBJ, GD_KINDS };
+enum {
+  GD_BOOL, GD_INT, GD_FLOAT, GD_STR, GD_VEC2, GD_OBJ, GD_CALL, GD_KINDS
+};
 
 static const GDExtensionVariantType gd_types[GD_KINDS] = {
   GDEXTENSION_VARIANT_TYPE_BOOL,    GDEXTENSION_VARIANT_TYPE_INT,
   GDEXTENSION_VARIANT_TYPE_FLOAT,   GDEXTENSION_VARIANT_TYPE_STRING,
   GDEXTENSION_VARIANT_TYPE_VECTOR2, GDEXTENSION_VARIANT_TYPE_OBJECT,
+  GDEXTENSION_VARIANT_TYPE_CALLABLE,
 };
 
 static GDExtensionVariantFromTypeConstructorFunc gd_from[GD_KINDS];
@@ -85,6 +91,25 @@ static void gd_error(const char* what, const char* name) {
   gd_util_error(NULL, args, 1);
   gd_var_free(&v);
   gd_str_free(&s);
+}
+
+// classdb_construct_object2 leaves NOTIFICATION_POSTINITIALIZE (0) to the
+// caller. A Node2D gets by without it; a Control crashes on first use.
+static void gd_postinit(GDExtensionObjectPtr o) {
+  GdName  method = gd_name("notification");
+  int64_t what   = 0;
+  GdVar   self;
+  GdVar   arg;
+  GdVar   ret;
+  GDExtensionCallError err = { 0 };
+  gd_from[GD_OBJ](&self, &o);
+  gd_from[GD_INT](&arg, &what);
+  GDExtensionConstVariantPtr args[1] = { &arg };
+  gd_var_call(&self, &method, args, 1, &ret, &err);
+  gd_var_free(&ret);
+  gd_var_free(&arg);
+  gd_var_free(&self);
+  gd_sn_free(&method);
 }
 
 // Objects
@@ -223,6 +248,46 @@ static void gd_boot(void) {
   gd_pump();
 }
 
+// Signals
+// -------
+
+// Godot calls a connected signal whenever it fires, often from inside a
+// gd.call the program is still in, and Bend cannot be entered twice. So
+// the Callable a connect makes only queues what it heard, the program's
+// tag and a copy of the arguments, and the program takes the queue when
+// it next asks (Godot.signals), in the order the signals fired.
+typedef struct {
+  u32    tag;
+  u32    argc;
+  GdVar* args;
+} GdEvent;
+
+static GdEvent* gd_events;
+static u32      gd_events_head;
+static u32      gd_events_len;
+static u32      gd_events_cap;
+
+static void gd_signal_call(void* data, const GDExtensionConstVariantPtr* args,
+  GDExtensionInt argc, GDExtensionVariantPtr ret, GDExtensionCallError* err) {
+  if (gd_events_head == gd_events_len) {
+    gd_events_head = 0;
+    gd_events_len  = 0;
+  }
+  if (gd_events_len == gd_events_cap) {
+    gd_events_cap = gd_events_cap == 0 ? 32 : 2 * gd_events_cap;
+    gd_events     = io_mem(realloc(gd_events, gd_events_cap * sizeof(GdEvent)));
+  }
+  GdEvent* ev = &gd_events[gd_events_len];
+  gd_events_len += 1;
+  ev->tag  = (u32)(uintptr_t)data;
+  ev->argc = (u32)argc;
+  ev->args = argc == 0 ? NULL : io_mem(malloc((size_t)argc * sizeof(GdVar)));
+  for (u32 i = 0; i < ev->argc; i += 1) {
+    gd_var_copy(&ev->args[i], args[i]);
+  }
+  err->error = GDEXTENSION_CALL_OK;
+}
+
 // Effects
 // -------
 
@@ -279,6 +344,8 @@ Term gd_new_run(Env e, Term* f, IoWork* w) {
   GDExtensionObjectPtr o = gd_construct(&name);
   if (o == NULL) {
     gd_error("no class to instantiate named ", text);
+  } else {
+    gd_postinit(o);
   }
   gd_sn_free(&name);
   free(text);
@@ -453,6 +520,72 @@ Term gd_pop_obj_run(Env e, Term* f, IoWork* w) {
   return (Term)slot;
 }
 
+// gd.connect joins a signal to the queue under the program's tag. The
+// Callable belongs to the BendRuntime node, so Godot drops the connection
+// with it.
+Term gd_connect_run(Env e, Term* f, IoWork* w) {
+  uint64_t n = 0;
+  GdVar* self = gd_slot_var((u32)f[0]);
+  char*  text = io_cstr(e, f[1], &n);
+  if (self == NULL) {
+    gd_error("a connect on null or on a freed object: ", text);
+  } else {
+    GDExtensionCallableCustomInfo2 info = {
+      .callable_userdata = (void*)(uintptr_t)(u32)f[2],
+      .token             = gd_lib,
+      .object_id         = gd_obj_id(gd_self),
+      .call_func         = gd_signal_call,
+    };
+    GdCall call;
+    GdStr  name;
+    GdVar  args[2];
+    GdVar  ret;
+    GdName method = gd_name("connect");
+    GDExtensionCallError err = { 0 };
+    gd_callable(&call, &info);
+    gd_str_new(&name, text, (GDExtensionInt)n);
+    gd_from[GD_STR](&args[0], &name);
+    gd_from[GD_CALL](&args[1], &call);
+    GDExtensionConstVariantPtr ptrs[2] = { &args[0], &args[1] };
+    gd_var_call(self, &method, ptrs, 2, &ret, &err);
+    int64_t code = 0;
+    gd_into[GD_INT](&code, &ret);
+    if (err.error != GDEXTENSION_CALL_OK || code != 0) {
+      gd_error("no signal to connect named ", text);
+    }
+    gd_var_free(&ret);
+    gd_var_free(&args[1]);
+    gd_var_free(&args[0]);
+    gd_str_free(&name);
+    gd_sn_free(&method);
+    gd_call_free(&call);
+  }
+  free(text);
+  return GD_UNIT;
+}
+
+// gd.events counts the queue.
+Term gd_events_run(Env e, Term* f, IoWork* w) {
+  return (Term)(gd_events_len - gd_events_head);
+}
+
+// gd.event takes the oldest: its arguments go on the stack, first to
+// last, then their count, and the answer is the tag.
+Term gd_event_run(Env e, Term* f, IoWork* w) {
+  if (gd_events_head == gd_events_len) {
+    err_fail("godot: an event taken from an empty queue");
+  }
+  GdEvent ev = gd_events[gd_events_head];
+  gd_events_head += 1;
+  for (u32 i = 0; i < ev.argc; i += 1) {
+    *gd_push() = ev.args[i];
+  }
+  free(ev.args);
+  int64_t argc = ev.argc;
+  gd_from[GD_INT](gd_push(), &argc);
+  return (Term)ev.tag;
+}
+
 // Bend drops a def no program reaches, and its CID_ macro with it, so
 // each effect registers only when the program can ask for it.
 static void __attribute__((constructor)) gd_use(void) {
@@ -516,6 +649,15 @@ static void __attribute__((constructor)) gd_use(void) {
 #ifdef CID_GD_POP_VEC2
   io_eff(CID_GD_POP_VEC2, gd_pop_vec2_run, 0);
 #endif
+#ifdef CID_GD_CONNECT
+  io_eff(CID_GD_CONNECT, gd_connect_run, 0);
+#endif
+#ifdef CID_GD_EVENTS
+  io_eff(CID_GD_EVENTS, gd_events_run, 0);
+#endif
+#ifdef CID_GD_EVENT
+  io_eff(CID_GD_EVENT, gd_event_run, 0);
+#endif
 #ifdef CID_GD_POP_OBJ
   io_eff(CID_GD_POP_OBJ, gd_pop_obj_run, 0);
 #endif
@@ -530,20 +672,7 @@ static GDExtensionObjectPtr gd_rt_create(void* data, GDExtensionBool notify) {
   GDExtensionObjectPtr o = gd_construct(&gd_n_node);
   gd_set_instance(o, &gd_n_runtime, o);
   if (notify) {
-    // NOTIFICATION_POSTINITIALIZE, which construct_object2 leaves to us.
-    GdName  method = gd_name("notification");
-    int64_t what   = 0;
-    GdVar   self;
-    GdVar   arg;
-    GdVar   ret;
-    GDExtensionCallError err = { 0 };
-    gd_from[GD_OBJ](&self, &o);
-    gd_from[GD_INT](&arg, &what);
-    GDExtensionConstVariantPtr args[1] = { &arg };
-    gd_var_call(&self, &method, args, 1, &ret, &err);
-    gd_var_free(&ret);
-    gd_var_free(&arg);
-    gd_var_free(&self);
+    gd_postinit(o);
   }
   return o;
 }
@@ -629,6 +758,13 @@ static void gd_level_exit(void* data, GDExtensionInitializationLevel level) {
   while (gd_sp > 0) {
     gd_var_free(gd_top());
   }
+  for (; gd_events_head < gd_events_len; gd_events_head += 1) {
+    GdEvent* ev = &gd_events[gd_events_head];
+    for (u32 i = 0; i < ev->argc; i += 1) {
+      gd_var_free(&ev->args[i]);
+    }
+    free(ev->args);
+  }
   gd_rows_len = 1;
   // Godot must not find the class once this level is gone.
   ((GDExtensionInterfaceClassdbUnregisterExtensionClass)
@@ -670,6 +806,8 @@ GDExtensionBool godot_bend_init(GDExtensionInterfaceGetProcAddress get,
     get("object_get_instance_from_id");
   gd_global       = (GDExtensionInterfaceGlobalGetSingleton)
     get("global_get_singleton");
+  gd_callable     = (GDExtensionInterfaceCallableCustomCreate2)
+    get("callable_custom_create2");
   GDExtensionInterfaceGetVariantFromTypeConstructor from =
     (GDExtensionInterfaceGetVariantFromTypeConstructor)
     get("get_variant_from_type_constructor");
@@ -685,6 +823,7 @@ GDExtensionBool godot_bend_init(GDExtensionInterfaceGetProcAddress get,
     get("variant_get_ptr_destructor");
   gd_str_free = destructor(GDEXTENSION_VARIANT_TYPE_STRING);
   gd_sn_free  = destructor(GDEXTENSION_VARIANT_TYPE_STRING_NAME);
+  gd_call_free = destructor(GDEXTENSION_VARIANT_TYPE_CALLABLE);
   gd_n_node    = gd_name("Node");
   gd_n_runtime = gd_name("BendRuntime");
   gd_n_ready   = gd_name("_ready");

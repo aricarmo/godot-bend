@@ -109,6 +109,21 @@ def gd.pop_obj() -> IO(U32):
   import "./godot.c"
   import "./godot.js"
 
+def gd.connect(slot: U32, signal: String, tag: U32) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
+# How many signals wait in the queue.
+def gd.events() -> IO(Nat):
+  import "./godot.c"
+  import "./godot.js"
+
+# Takes the oldest: answers its tag, and leaves on the stack its
+# arguments, first to last, under their count.
+def gd.event() -> IO(U32):
+  import "./godot.c"
+  import "./godot.js"
+
 # Variant
 # -------
 
@@ -218,6 +233,43 @@ def Variant.pop() -> IO(Variant):
     kind : Nat <- gd.kind()
     Variant.pop_as(kind)
 
+# Pops n values pushed first to last: the top is the last, so each pop
+# conses onto the ones after it.
+def Variant.pop_n(n: Nat, acc: List<Variant>) -> IO(List<Variant>):
+  match n:
+    case 0n:
+      IO.pure(List<Variant>, acc)
+    case 1n+p:
+      do IO<List<Variant>>:
+        v : Variant <- Variant.pop()
+        Variant.pop_n(p, v <> acc)
+
+# Signal
+# ------
+
+# A signal that fired: the tag its connect chose, and what it carried. It
+# holds a plain List, which is affine, so a Signal is too (Type, not Data):
+# match it once.
+type Signal is Type:
+  Signal{tag: U32, args: List<Variant>}
+
+def Signal.next() -> IO(Signal):
+  do IO<Signal>:
+    tag : U32 <- gd.event()
+    argc : U32 <- gd.pop_int()
+    args : List<Variant> <- Variant.pop_n(U32.to_nat(argc), [])
+    return Signal{tag, args}
+
+def Signal.take(n: Nat) -> IO(List<Signal>):
+  match n:
+    case 0n:
+      IO.pure(List<Signal>, [])
+    case 1n+p:
+      do IO<List<Signal>>:
+        s : Signal <- Signal.next()
+        rest : List<Signal> <- Signal.take(p)
+        return s <> rest
+
 # API
 # ---
 
@@ -261,3 +313,17 @@ def set(obj: Object, property: String, value: Variant) -> IO(Unit):
 # A node by path, from another: Nil when the path leads nowhere.
 def node(from: Object, path: String) -> IO(Variant):
   call(from, "get_node_or_null", [VStr{path}])
+
+# Connects a signal of obj to the program under a tag of its choosing.
+# Godot never calls into Bend: a signal that fires waits in a queue, and
+# signals() hands the queue over.
+def connect(obj: Object, signal: String, tag: U32) -> IO(Unit):
+  Obj{slot} = obj
+  gd.connect(slot, signal, tag)
+
+# Every signal that fired since the last ask, oldest first. The natural
+# place to ask is right after frame().
+def signals() -> IO(List<Signal>):
+  do IO<List<Signal>>:
+    n : Nat <- gd.events()
+    Signal.take(n)

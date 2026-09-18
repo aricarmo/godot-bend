@@ -65,3 +65,8 @@ function gd_pop_float() { return gd_take(); }
 function gd_pop_str()   { return gd_take(); }
 function gd_pop_vec2()  { const p = gd_take(); return io_tup(p[0], p[1]); }
 function gd_pop_obj()   { return gd_take(); }
+
+// No engine, no signals: the queue stays empty.
+function gd_connect(slot, signal, tag) { return GD_UNIT; }
+function gd_events()                   { return 0n; }
+function gd_event()                    { return 0; }

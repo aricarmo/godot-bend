@@ -1,0 +1,8 @@
+[configuration]
+
+entry_symbol = "godot_bend_init"
+compatibility_minimum = "4.4"
+
+[libraries]
+
+macos = "res://bin/libgame.dylib"

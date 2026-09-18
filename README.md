@@ -21,8 +21,9 @@ def main() -> IO(Unit):
 **Status: early, and working.** A Bend program compiles into a GDExtension
 library, Godot loads it, and the program runs frame by frame inside the
 engine. It reaches the engine through a dynamic core: any method of any
-object by name, as GDScript's `obj.call(..)` does. Typed wrappers, signals
-and input are the roadmap below. Tested with Godot 4.6.3 on macOS arm64.
+object by name, as GDScript's `obj.call(..)` does, and hears its signals.
+There is a [Pong](pong/main.bend) written in it. Typed wrappers and more
+value kinds are the roadmap below. Tested with Godot 4.6.3 on macOS arm64.
 
 ## The API
 
@@ -36,6 +37,8 @@ and input are the roadmap below. Tested with Godot 4.6.3 on macOS arm64.
 | `Godot.call(obj, method, args)` | Any method by name; answers a `Variant` |
 | `Godot.get(obj, property)` / `Godot.set(obj, property, value)` | Properties |
 | `Godot.node(from, path)` | A node by path, `VNil` when there is none |
+| `Godot.connect(obj, signal, tag)` | Hears a signal, under a tag of your choosing |
+| `Godot.signals()` | The signals fired since the last ask, oldest first: `Signal{tag, args}` |
 
 A `Variant` is `VNil`, `VBool`, `VInt` (the low 32 bits), `VFloat`, `VStr`
 (also what a `StringName` or `NodePath` arrives as), `VVec2`, `VObj`, or
@@ -43,6 +46,13 @@ A `Variant` is `VNil`, `VBool`, `VInt` (the low 32 bits), `VFloat`, `VStr`
 never a pointer: it copies freely, and a call on a freed object logs an error
 in Godot and answers `VNil` instead of crashing. So does a method that does
 not exist.
+
+Godot never calls into Bend. A signal may fire in the middle of a
+`Godot.call` the program is still inside, and a Bend program cannot be entered
+twice, so a connected signal only joins a queue, with a copy of its arguments,
+and `Godot.signals()` hands the queue over; the natural place to ask is right
+after `Godot.frame()`. Input needs no events: poll it, as in
+`Godot.call(input, "is_key_pressed", [Godot.VInt{87}])`.
 
 ## How it works
 
@@ -103,6 +113,19 @@ Drop `--headless` to watch the sprite orbit. The very first headless
 import is done; that is [godot#123511](https://github.com/godotengine/godot/issues/123511),
 not this binding, and the next run is clean.
 
+![Pong, written in Bend, running in Godot](media/pong.png)
+
+Pong builds the same way (W/S or the arrows against the machine):
+
+```sh
+tools/build.sh pong/main.bend pong/bin/libgame.dylib
+godot --path pong --headless --import
+godot --path pong
+```
+
+Its rules are pure Bend functions over `F32`s; the IO loop reads the keys,
+steps the rules once per frame and moves four Godot nodes.
+
 `GODOT=/path/to/godot tools/test.sh` runs `tests/*.bend` inside the engine
 and compares their output.
 
@@ -119,7 +142,8 @@ and runs it outside the engine, on the JS twins of the effects
 | `godot/godot.js` | JS twins of the effects, for checking and running outside Godot |
 | `godot/gdextension_interface.h` | Godot's C API, dumped from 4.6.3 |
 | `tools/build.sh` | `.bend` → `.c` → shared library |
-| `demo/` | A Godot project that runs `demo/main.bend` |
+| `demo/` | A Godot project that runs `demo/main.bend`: a sprite in orbit |
+| `pong/` | Pong: pure rules, a Godot scene built from Bend, keyboard input |
 | `tests/` | Programs run inside a headless Godot by `tools/test.sh` |
 | `vendor/bend` | The Bend compiler, pinned as a submodule |
 
@@ -130,7 +154,9 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] A dynamic core: `Godot.call(object, method, args)`, get/set property,
       node lookup, instantiate, singletons
 - [ ] More `Variant` kinds: Vector3, Color, arrays, dictionaries, 64-bit ints
-- [ ] Input and signals delivered to the program as events on `frame`
+- [x] Signals delivered to the program as a queue; input by polling
+- [x] A game: Pong
+- [ ] `_input` events, and calls from GDScript into a running program
 - [ ] Typed wrappers generated from `extension_api.json` over the dynamic core
 - [ ] A non-blocking poll in the pump, so `IO.sleep`, sockets and channels
       work inside Godot
