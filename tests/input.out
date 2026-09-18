@@ -1,0 +1,8 @@
+held: Old
+ERROR: bend: a call on null or on a freed object: get
+dropped: nil
+ERROR: bend: a call on null or on a freed object: get
+old handle, row taken again: nil
+new handle: New
+signal 4294967295: 87 true false
+bend: done

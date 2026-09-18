@@ -37,6 +37,7 @@ static GDExtensionInterfaceObjectGetInstanceId          gd_obj_id;
 static GDExtensionInterfaceObjectGetInstanceFromId      gd_obj_at;
 static GDExtensionInterfaceGlobalGetSingleton           gd_global;
 static GDExtensionInterfaceCallableCustomCreate2        gd_callable;
+static GDExtensionInterfaceRefGetObject                 gd_ref_obj;
 static GDExtensionPtrDestructor                         gd_str_free;
 static GDExtensionPtrDestructor                         gd_sn_free;
 static GDExtensionPtrDestructor                         gd_call_free;
@@ -75,6 +76,7 @@ static GdName gd_n_node;
 static GdName gd_n_runtime;
 static GdName gd_n_ready;
 static GdName gd_n_process;
+static GdName gd_n_input;
 
 // Never a static StringName: that one keeps a pointer to s, a literal of
 // this library, which Godot may unload before the name's last reader.
@@ -120,29 +122,61 @@ static void gd_postinit(GDExtensionObjectPtr o) {
 // Objects
 // -------
 
-// A Bend Object is a slot of this table. A row keeps the instance id, the
-// test that the object still lives, and a Variant of it, which holds a
-// RefCounted (a texture, any Resource) alive while the program may name
-// it. Rows are found again by id, so an object met every frame keeps one
-// slot; none is freed yet. Slot 0 is null.
+// A Bend Object is a handle into this table: a row in the low 20 bits, the
+// row's generation above them. A row keeps the instance id, the test that
+// the object still lives, and a Variant of it, which holds a RefCounted (a
+// texture, any Resource) alive while the program may name it. Rows are
+// found again by id, so an object met every frame keeps one handle.
+// Godot.drop frees a row; the next object to take it gets a new generation,
+// so a handle kept past its drop names nothing, never the newcomer.
+// Handle 0 is null.
+#define GD_ROW_BITS 20
+#define GD_ROW_MASK ((1u << GD_ROW_BITS) - 1)
+#define GD_TOMB     (~0u)
+
 typedef struct {
-  u64   id;
+  u64   id;   // 0 when the row is free
+  u32   gen;
+  u32   next; // the free list
   GdVar var;
 } GdRow;
 
 static GdRow* gd_rows;
 static u32    gd_rows_len = 1;
 static u32    gd_rows_cap;
-static u32*   gd_index;     // open addressing, id -> slot, 0 is empty
+static u32    gd_rows_free;
+static u32*   gd_index;     // open addressing, id -> row; 0 empty, GD_TOMB
 static u32    gd_index_cap;
+static u32    gd_index_used;
 
-static void gd_index_put(u64 id, u32 slot) {
-  u32 i = (u32)(id * 0x9E3779B97F4A7C15ull >> 32) & (gd_index_cap - 1);
-  while (gd_index[i] != 0) {
+static u32 gd_index_at(u64 id) {
+  return (u32)(id * 0x9E3779B97F4A7C15ull >> 32) & (gd_index_cap - 1);
+}
+
+static void gd_index_put(u64 id, u32 row) {
+  u32 i = gd_index_at(id);
+  while (gd_index[i] != 0 && gd_index[i] != GD_TOMB) {
     i = (i + 1) & (gd_index_cap - 1);
   }
-  gd_index[i] = slot;
+  gd_index_used += gd_index[i] == 0;
+  gd_index[i] = row;
 }
+
+// The slot of the index that holds id's row, or -1.
+static int64_t gd_index_find(u64 id) {
+  if (gd_index_cap == 0) {
+    return -1;
+  }
+  for (u32 i = gd_index_at(id); gd_index[i] != 0;
+    i = (i + 1) & (gd_index_cap - 1)) {
+    if (gd_index[i] != GD_TOMB && gd_rows[gd_index[i]].id == id) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+#define gd_handle(row) ((gd_rows[row].gen << GD_ROW_BITS) | (row))
 
 static u32 gd_slot_of(const GdVar* v) {
   GDExtensionObjectPtr o = NULL;
@@ -150,33 +184,41 @@ static u32 gd_slot_of(const GdVar* v) {
   if (o == NULL) {
     return 0;
   }
-  u64 id = gd_obj_id(o);
-  if (gd_index_cap != 0) {
-    u32 i = (u32)(id * 0x9E3779B97F4A7C15ull >> 32) & (gd_index_cap - 1);
-    for (; gd_index[i] != 0; i = (i + 1) & (gd_index_cap - 1)) {
-      if (gd_rows[gd_index[i]].id == id) {
-        return gd_index[i];
+  u64     id = gd_obj_id(o);
+  int64_t at = gd_index_find(id);
+  if (at >= 0) {
+    return gd_handle(gd_index[at]);
+  }
+  if (2 * (gd_index_used + 1) >= gd_index_cap) {
+    gd_index_cap  = gd_index_cap == 0 ? 256 : 2 * gd_index_cap;
+    gd_index_used = 0;
+    free(gd_index);
+    gd_index = io_mem(calloc(gd_index_cap, sizeof(u32)));
+    for (u32 r = 1; r < gd_rows_len; r += 1) {
+      if (gd_rows[r].id != 0) {
+        gd_index_put(gd_rows[r].id, r);
       }
     }
   }
-  if (gd_rows_len >= gd_rows_cap) {
-    gd_rows_cap = gd_rows_cap == 0 ? 64 : 2 * gd_rows_cap;
-    gd_rows     = io_mem(realloc(gd_rows, gd_rows_cap * sizeof(GdRow)));
-  }
-  if (2 * gd_rows_len >= gd_index_cap) {
-    gd_index_cap = gd_index_cap == 0 ? 256 : 2 * gd_index_cap;
-    free(gd_index);
-    gd_index = io_mem(calloc(gd_index_cap, sizeof(u32)));
-    for (u32 s = 1; s < gd_rows_len; s += 1) {
-      gd_index_put(gd_rows[s].id, s);
+  u32 row = gd_rows_free;
+  if (row != 0) {
+    gd_rows_free = gd_rows[row].next;
+  } else {
+    if (gd_rows_len > GD_ROW_MASK) {
+      err_fail("godot: more than 1048575 objects held at once; drop some");
     }
+    if (gd_rows_len >= gd_rows_cap) {
+      gd_rows_cap = gd_rows_cap == 0 ? 64 : 2 * gd_rows_cap;
+      gd_rows     = io_mem(realloc(gd_rows, gd_rows_cap * sizeof(GdRow)));
+    }
+    row = gd_rows_len;
+    gd_rows_len += 1;
+    gd_rows[row].gen = 0;
   }
-  u32 slot = gd_rows_len;
-  gd_rows_len += 1;
-  gd_rows[slot].id = id;
-  gd_var_copy(&gd_rows[slot].var, (GDExtensionConstVariantPtr)v);
-  gd_index_put(id, slot);
-  return slot;
+  gd_rows[row].id = id;
+  gd_var_copy(&gd_rows[row].var, (GDExtensionConstVariantPtr)v);
+  gd_index_put(id, row);
+  return gd_handle(row);
 }
 
 static u32 gd_slot_new(GDExtensionObjectPtr o) {
@@ -187,13 +229,31 @@ static u32 gd_slot_new(GDExtensionObjectPtr o) {
   return slot;
 }
 
-// The row's Variant, or NULL for null, a bad slot, or a freed object.
-static GdVar* gd_slot_var(u32 slot) {
-  if (slot == 0 || slot >= gd_rows_len
-    || gd_obj_at(gd_rows[slot].id) == NULL) {
-    return NULL;
+// The handle's row, or 0 for null, a dropped handle, or a bad one.
+static u32 gd_slot_row(u32 handle) {
+  u32 row = handle & GD_ROW_MASK;
+  return row != 0 && row < gd_rows_len && gd_rows[row].id != 0
+    && gd_rows[row].gen == handle >> GD_ROW_BITS ? row : 0;
+}
+
+// The handle's Variant, or NULL when it names nothing or a freed object.
+static GdVar* gd_slot_var(u32 handle) {
+  u32 row = gd_slot_row(handle);
+  return row == 0 || gd_obj_at(gd_rows[row].id) == NULL
+    ? NULL : &gd_rows[row].var;
+}
+
+static void gd_slot_drop(u32 handle) {
+  u32 row = gd_slot_row(handle);
+  if (row == 0) {
+    return;
   }
-  return &gd_rows[slot].var;
+  gd_index[gd_index_find(gd_rows[row].id)] = GD_TOMB;
+  gd_var_free(&gd_rows[row].var);
+  gd_rows[row].id   = 0;
+  gd_rows[row].gen  = (gd_rows[row].gen + 1) & ((1u << (32 - GD_ROW_BITS)) - 1);
+  gd_rows[row].next = gd_rows_free;
+  gd_rows_free      = row;
 }
 
 // Stack
@@ -347,14 +407,18 @@ Term gd_new_run(Env e, Term* f, IoWork* w) {
   GdName name;
   gd_sn_utf8(&name, text, (GDExtensionInt)n);
   GDExtensionObjectPtr o = gd_construct(&name);
+  u32 slot = 0;
   if (o == NULL) {
     gd_error("no class to instantiate named ", text);
   } else {
+    // The handle first: its Variant is a RefCounted's first reference, and
+    // the one gd_postinit takes and lets go would otherwise free it.
+    slot = gd_slot_new(o);
     gd_postinit(o);
   }
   gd_sn_free(&name);
   free(text);
-  return (Term)(o == NULL ? 0 : gd_slot_new(o));
+  return (Term)slot;
 }
 
 Term gd_push_nil_run(Env e, Term* f, IoWork* w) {
@@ -613,6 +677,20 @@ Term gd_pop_obj_run(Env e, Term* f, IoWork* w) {
   return (Term)slot;
 }
 
+Term gd_drop_run(Env e, Term* f, IoWork* w) {
+  gd_slot_drop((u32)f[0]);
+  return GD_UNIT;
+}
+
+// gd.listen turns the input events on or off; off is the default, since a
+// program that never takes its signals would only grow the queue.
+static bool gd_listening;
+
+Term gd_listen_run(Env e, Term* f, IoWork* w) {
+  gd_listening = (u32)f[0] != 0;
+  return GD_UNIT;
+}
+
 // gd.connect joins a signal to the queue under the program's tag. The
 // Callable belongs to the BendRuntime node, so Godot drops the connection
 // with it.
@@ -760,6 +838,12 @@ static void __attribute__((constructor)) gd_use(void) {
 #ifdef CID_GD_POP_COLOR
   io_eff(CID_GD_POP_COLOR, gd_pop_color_run, 0);
 #endif
+#ifdef CID_GD_DROP
+  io_eff(CID_GD_DROP, gd_drop_run, 0);
+#endif
+#ifdef CID_GD_LISTEN
+  io_eff(CID_GD_LISTEN, gd_listen_run, 0);
+#endif
 #ifdef CID_GD_CONNECT
   io_eff(CID_GD_CONNECT, gd_connect_run, 0);
 #endif
@@ -772,6 +856,58 @@ static void __attribute__((constructor)) gd_use(void) {
 #ifdef CID_GD_POP_OBJ
   io_eff(CID_GD_POP_OBJ, gd_pop_obj_run, 0);
 #endif
+}
+
+// Input
+// -----
+
+// An input event joins the signal queue already taken apart, as values
+// under a reserved tag, so no InputEvent handle is made for the program to
+// drop: 4294967295 a key (keycode, pressed, echo), 4294967294 a mouse
+// button (index, pressed, position), 4294967293 a mouse move (position,
+// relative).
+static void gd_input(GDExtensionObjectPtr event) {
+  static const struct { const char* cls; u32 tag; const char* get[3]; }
+  kinds[3] = {
+    { "InputEventKey",         4294967295u,
+      { "get_keycode", "is_pressed", "is_echo" } },
+    { "InputEventMouseButton", 4294967294u,
+      { "get_button_index", "is_pressed", "get_position" } },
+    { "InputEventMouseMotion", 4294967293u,
+      { "get_position", "get_relative", NULL } },
+  };
+  GdVar self;
+  gd_from[GD_OBJ](&self, &event);
+  for (int k = 0; k < 3; k += 1) {
+    GdStr cls;
+    GdVar arg;
+    GdVar is;
+    GDExtensionBool yes = 0;
+    gd_str_new(&cls, kinds[k].cls, (GDExtensionInt)strlen(kinds[k].cls));
+    gd_from[GD_STR](&arg, &cls);
+    gd_method(&self, "is_class", &arg, &is);
+    gd_into[GD_BOOL](&yes, &is);
+    gd_var_free(&is);
+    gd_var_free(&arg);
+    gd_str_free(&cls);
+    if (!yes) {
+      continue;
+    }
+    GdVar vals[3];
+    GDExtensionConstVariantPtr ptrs[3];
+    u32 n = 0;
+    for (; n < 3 && kinds[k].get[n] != NULL; n += 1) {
+      gd_method(&self, kinds[k].get[n], NULL, &vals[n]);
+      ptrs[n] = &vals[n];
+    }
+    GDExtensionCallError err = { 0 };
+    gd_signal_call((void*)(uintptr_t)kinds[k].tag, ptrs, n, NULL, &err);
+    for (u32 i = 0; i < n; i += 1) {
+      gd_var_free(&vals[i]);
+    }
+    break;
+  }
+  gd_var_free(&self);
 }
 
 // BendRuntime
@@ -795,7 +931,7 @@ static void* gd_rt_virtual(void* data, GDExtensionConstStringNamePtr name,
   uint32_t hash) {
   void* p = ((const GdName*)name)->p;
   return p == gd_n_ready.p ? &gd_n_ready : p == gd_n_process.p
-    ? &gd_n_process : NULL;
+    ? &gd_n_process : p == gd_n_input.p ? &gd_n_input : NULL;
 }
 
 // A GDExtension class also runs inside the editor, when its scene is
@@ -823,6 +959,12 @@ static void gd_rt_call(GDExtensionClassInstancePtr self,
     if (!gd_up && !gd_in_editor()) {
       gd_self = (GDExtensionObjectPtr)self;
       gd_boot();
+    }
+    return;
+  }
+  if (which == &gd_n_input) {
+    if (gd_up && gd_listening && gd_code < 0) {
+      gd_input(gd_ref_obj(args[0]));
     }
     return;
   }
@@ -864,7 +1006,9 @@ static void gd_level_exit(void* data, GDExtensionInitializationLevel level) {
     return;
   }
   for (u32 s = 1; s < gd_rows_len; s += 1) {
-    gd_var_free(&gd_rows[s].var);
+    if (gd_rows[s].id != 0) {
+      gd_var_free(&gd_rows[s].var);
+    }
   }
   while (gd_sp > 0) {
     gd_var_free(gd_top());
@@ -876,7 +1020,8 @@ static void gd_level_exit(void* data, GDExtensionInitializationLevel level) {
     }
     free(ev->args);
   }
-  gd_rows_len = 1;
+  gd_rows_len  = 1;
+  gd_rows_free = 0;
   // Godot must not find the class once this level is gone.
   ((GDExtensionInterfaceClassdbUnregisterExtensionClass)
     ((GDExtensionInterfaceGetProcAddress)data)(
@@ -919,6 +1064,8 @@ GDExtensionBool godot_bend_init(GDExtensionInterfaceGetProcAddress get,
     get("object_get_instance_from_id");
   gd_global       = (GDExtensionInterfaceGlobalGetSingleton)
     get("global_get_singleton");
+  gd_ref_obj      = (GDExtensionInterfaceRefGetObject)
+    get("ref_get_object");
   gd_callable     = (GDExtensionInterfaceCallableCustomCreate2)
     get("callable_custom_create2");
   GDExtensionInterfaceGetVariantFromTypeConstructor from =
@@ -941,6 +1088,7 @@ GDExtensionBool godot_bend_init(GDExtensionInterfaceGetProcAddress get,
   gd_n_runtime = gd_name("BendRuntime");
   gd_n_ready   = gd_name("_ready");
   gd_n_process = gd_name("_process");
+  gd_n_input   = gd_name("_input");
   GDExtensionInterfaceVariantGetPtrUtilityFunction util =
     (GDExtensionInterfaceVariantGetPtrUtilityFunction)
     get("variant_get_ptr_utility_function");

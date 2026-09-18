@@ -39,6 +39,8 @@ value kinds are the roadmap below. Tested with Godot 4.6.3 on macOS arm64.
 | `Godot.node(from, path)` | A node by path, `VNil` when there is none |
 | `Godot.connect(obj, signal, tag)` | Hears a signal, under a tag of your choosing |
 | `Godot.signals()` | The signals fired since the last ask, oldest first: `Signal{tag, args}` |
+| `Godot.listen(on)` | Input events join that queue, as values (see below) |
+| `Godot.drop(obj)` | Lets go of a handle the program is done with |
 
 A `Variant` is `VNil`, `VBool`, `VInt`, `VFloat`, `VStr` (also what a
 `StringName` or `NodePath` arrives as), `VVec2`, `VVec3`, `VColor`, `VArr`
@@ -57,8 +59,25 @@ Godot never calls into Bend. A signal may fire in the middle of a
 `Godot.call` the program is still inside, and a Bend program cannot be entered
 twice, so a connected signal only joins a queue, with a copy of its arguments,
 and `Godot.signals()` hands the queue over; the natural place to ask is right
-after `Godot.frame()`. Input needs no events: poll it, as in
-`Godot.call(input, "is_key_pressed", [Godot.VInt{87}])`.
+after `Godot.frame()`.
+
+Input comes two ways. Poll it, as in
+`Godot.call(input, "is_key_pressed", [Godot.VInt{87}])`, or
+`Godot.listen(True{})` and events join the signal queue already taken apart
+into values, so there is no `InputEvent` handle to manage: a key under
+`Godot.key_tag()` with `[VInt keycode, VBool pressed, VBool echo]`, a mouse
+button under `Godot.button_tag()` with `[VInt index, VBool pressed, VVec2
+position]`, a mouse move under `Godot.motion_tag()` with `[VVec2 position,
+VVec2 relative]`.
+
+GDScript reaches a running program through the same queue: let the program
+connect a user signal of its own node (`add_user_signal`, then
+`Godot.connect(me, "to_bend", 1)`), and `$Bend.emit_signal("to_bend", ..)`
+from any script lands in `Godot.signals()`.
+
+The handle table keeps every object a program meets, and keeps a RefCounted
+one alive, until `Godot.drop`. A handle carries its row's generation, so one
+kept past its drop names nothing, never the object that took the row.
 
 ## How it works
 
@@ -163,7 +182,8 @@ and runs it outside the engine, on the JS twins of the effects
 - [ ] Dictionaries, transforms, packed arrays, ints past 32 bits
 - [x] Signals delivered to the program as a queue; input by polling
 - [x] A game: Pong
-- [ ] `_input` events, and calls from GDScript into a running program
+- [x] `_input` events as values; GDScript into a running program, by signal
+- [x] `Godot.drop`, with generational handles
 - [ ] Typed wrappers generated from `extension_api.json` over the dynamic core
 - [ ] A non-blocking poll in the pump, so `IO.sleep`, sockets and channels
       work inside Godot
@@ -177,8 +197,7 @@ From how the Bend runtime is built today, and from what this binding has not don
 - The runtime installs its own `SIGSEGV`/`SIGBUS` handlers and reserves up to
   8 TiB of virtual address space, which iOS is unlikely to allow.
 - A runtime failure calls `exit`, which takes the editor down with it.
-- Object handles are never released: a program that creates objects without
-  end grows the handle table (and keeps every RefCounted it met alive).
+- Handles are released by hand (`Godot.drop`): nothing collects them.
 - Bend drops the effects a program never reaches, so `godot.c` registers each
   one under `#ifdef`; a new effect needs its line there.
 - The binding reaches into runtime internals (`io_step`, `io_runs`), so it is

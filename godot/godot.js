@@ -93,3 +93,5 @@ function gd_pop_color() {
 function gd_connect(slot, signal, tag) { return GD_UNIT; }
 function gd_events()                   { return 0n; }
 function gd_event()                    { return 0; }
+function gd_drop(slot)                 { return GD_UNIT; }
+function gd_listen(on)                 { return GD_UNIT; }

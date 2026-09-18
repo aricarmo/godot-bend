@@ -12,9 +12,10 @@
 import Base
 
 # An object of the engine. The slot names a row of godot.c's table of
-# instance ids, never a pointer: a handle is plain Data, so it copies
-# freely, and one whose object was freed answers Nil to every call instead
-# of dangling. Slot 0 is null. The raw effects carry the bare U32.
+# instance ids (and the row's generation), never a pointer: a handle is
+# plain Data, so it copies freely, and one whose object was freed, or that
+# was dropped, answers Nil to every call instead of dangling. Slot 0 is
+# null. The raw effects carry the bare U32.
 type Object is Data:
   Obj{slot: U32}
 
@@ -132,6 +133,14 @@ def gd.pop_color() -> IO(F32 & F32 & F32 & F32):
   import "./godot.js"
 
 def gd.pop_obj() -> IO(U32):
+  import "./godot.c"
+  import "./godot.js"
+
+def gd.drop(slot: U32) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
+def gd.listen(on: U32) -> IO(Unit):
   import "./godot.c"
   import "./godot.js"
 
@@ -429,3 +438,28 @@ def signals() -> IO(List<&2, Signal>):
   do IO<List<&2, Signal>>:
     n : Nat <- gd.events()
     Signal.take(n)
+
+# Lets go of a handle. The table keeps every object a program meets (and
+# keeps a RefCounted one alive) until then, so a program that meets new
+# objects without end drops the ones it is done with. It frees no node:
+# call "queue_free" for that. The handle, and every copy, then names
+# nothing.
+def drop(obj: Object) -> IO(Unit):
+  Obj{slot} = obj
+  gd.drop(slot)
+
+# Input events join the signal queue, already taken apart into values,
+# under these tags: a key carries [VInt keycode, VBool pressed, VBool
+# echo], a mouse button [VInt index, VBool pressed, VVec2 position], a
+# mouse move [VVec2 position, VVec2 relative]. They are off until listen.
+def listen(on: Bool) -> IO(Unit):
+  gd.listen(Variant.bit(on))
+
+def key_tag() -> U32:
+  4294967295
+
+def button_tag() -> U32:
+  4294967294
+
+def motion_tag() -> U32:
+  4294967293
