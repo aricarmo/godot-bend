@@ -12,8 +12,10 @@ import ../Godot.bend as Godot
 def new() -> IO(Godot.Object):
   Godot.new("OpenXRSpatialComponentBounded2DList")
 
-def get_center_pose(self: Godot.Object, index: U32) -> IO(Godot.Variant):
-  Godot.call(self, "get_center_pose", [Godot.VInt{index}])
+def get_center_pose(self: Godot.Object, index: U32) -> IO(Godot.Transform3D):
+  do IO<Godot.Transform3D>:
+    v : Godot.Variant <- Godot.call(self, "get_center_pose", [Godot.VInt{index}])
+    return Godot.to_transform3d(v)
 
 def get_size(self: Godot.Object, index: U32) -> IO(Godot.Vec2):
   Godot.call_vec2(self, "get_size", [Godot.VInt{index}])

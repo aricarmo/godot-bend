@@ -22,8 +22,7 @@ their types (Godot.util).
 
 A method's trailing arguments with defaults are left to Godot: `name` takes
 the required ones, and `name.all` takes every one. A method with an argument
-of a kind the binding does not carry yet (RID, Dictionary, Transform2D, ..)
-is skipped and counted in the file's header; an answer of such a kind comes
+of a kind the binding does not carry (a Signal, a raw pointer) is skipped and counted in the file's header; an answer of such a kind comes
 back as a raw Godot.Variant.
 """
 
@@ -51,7 +50,31 @@ PLAIN = {
     "Color":      ("Godot.Color",  "Godot.color(%s)",   "call_color"),
     "Array":      ("List<&2, Godot.Variant>", "Godot.VArr{%s}", "call_list"),
     "Variant":    ("Godot.Variant", "%s",               "call"),
+    "Vector2i":    ("Godot.Vec2i",       "Godot.vec2i(%s)",       "to_vec2i"),
+    "Vector3i":    ("Godot.Vec3i",       "Godot.vec3i(%s)",       "to_vec3i"),
+    "Rect2":       ("Godot.Rect2",       "Godot.rect2(%s)",       "to_rect2"),
+    "Rect2i":      ("Godot.Rect2i",      "Godot.rect2i(%s)",      "to_rect2i"),
+    "Transform2D": ("Godot.Transform2D", "Godot.transform2d(%s)", "to_transform2d"),
+    "Transform3D": ("Godot.Transform3D", "Godot.transform3d(%s)", "to_transform3d"),
+    "Basis":       ("Godot.Basis",       "Godot.basis(%s)",       "to_basis"),
+    "Quaternion":  ("Godot.Quaternion",  "Godot.quaternion(%s)",  "to_quaternion"),
+    "RID":         ("Godot.Rid",         "Godot.rid(%s)",         "to_rid"),
+    # A Callable goes in as the tag its calls will carry in signals().
+    "Callable":    ("U32",               "Godot.VCall{%s}",       "call"),
 }
+
+# Kinds with no Bend name yet: the raw Variant, which a program builds as
+# VFloats, VInts or VDict.
+for _t in ("Vector4", "Vector4i", "Plane", "AABB", "Projection", "Dictionary"):
+    PLAIN[_t] = PLAIN["Variant"]
+
+# A packed array goes in as a list under its Variant type, and comes back
+# as a list.
+for _t, _n in (("Byte", 29), ("Int32", 30), ("Int64", 31), ("Float32", 32),
+               ("Float64", 33), ("String", 34), ("Vector2", 35),
+               ("Vector3", 36), ("Color", 37), ("Vector4", 38)):
+    PLAIN["Packed%sArray" % _t] = (
+        "List<&2, Godot.Variant>", "Godot.VPacked{%d, %%s}" % _n, "call_list")
 
 
 def kind(gtype, classes):
@@ -60,6 +83,8 @@ def kind(gtype, classes):
         return PLAIN["int"]
     if gtype.startswith("typedarray::"):
         return PLAIN["Array"]
+    if gtype.startswith("typeddictionary::"):
+        return PLAIN["Variant"]
     if gtype in PLAIN:
         return PLAIN[gtype]
     if gtype in classes:
@@ -113,9 +138,10 @@ def answer(rkind, action, indent="  "):
         return [indent + "Godot.done(" + action + ")"]
     if rkind[2] == "call":
         return [indent + action]
+    reader = rkind[2] if rkind[2].startswith("to_") else "to_" + rkind[2][5:]
     return [indent + "do IO<%s>:" % rkind[0],
             indent + "  v : Godot.Variant <- " + action,
-            indent + "  return Godot.to_%s(v)" % rkind[2][5:]]
+            indent + "  return Godot.%s(v)" % reader]
 
 
 def method_defs(m, classes, used, owner=""):
@@ -130,7 +156,8 @@ def method_defs(m, classes, used, owner=""):
         return [], "argument"
     ret = m.get("return_value")
     rkind = kind(ret["type"], classes) if ret else None
-    if ret and rkind is None:
+    # A Callable is a tag only on the way in; one that comes back is raw.
+    if ret and (rkind is None or ret["type"] == "Callable"):
         rkind = PLAIN["Variant"]
     required = sum(1 for a in args if "default_value" not in a)
     out = []
@@ -158,6 +185,11 @@ def method_defs(m, classes, used, owner=""):
                 items = "List.append(&2, Godot.Variant, %s, rest)" % items
             out += answer(rkind if ret else None, 'Godot.static("%s", "%s", %d, %s)'
                           % (owner, m["name"], m["hash"], items))
+        elif ret and rkind[2].startswith("to_"):
+            items = "[" + ", ".join(values) + "]"
+            if m.get("is_vararg"):
+                items = "List.append(&2, Godot.Variant, %s, rest)" % items
+            out += answer(rkind, 'Godot.call(self, "%s", %s)' % (m["name"], items))
         else:
             out += def_body(caller, m["name"], values, m.get("is_vararg"))
         out += [""]

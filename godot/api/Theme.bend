@@ -58,11 +58,13 @@ def clear_icon(
 ) -> IO(Unit):
   Godot.run(self, "clear_icon", [Godot.VStr{name}, Godot.VStr{theme_type}])
 
-def get_icon_list(self: Godot.Object, theme_type: String) -> IO(Godot.Variant):
-  Godot.call(self, "get_icon_list", [Godot.VStr{theme_type}])
+def get_icon_list(
+  self: Godot.Object, theme_type: String
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_icon_list", [Godot.VStr{theme_type}])
 
-def get_icon_type_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_icon_type_list", [])
+def get_icon_type_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_icon_type_list", [])
 
 def set_stylebox(
   self: Godot.Object, name: String, theme_type: String, texture: Godot.Object
@@ -95,11 +97,11 @@ def clear_stylebox(
 
 def get_stylebox_list(
   self: Godot.Object, theme_type: String
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_stylebox_list", [Godot.VStr{theme_type}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_stylebox_list", [Godot.VStr{theme_type}])
 
-def get_stylebox_type_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_stylebox_type_list", [])
+def get_stylebox_type_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_stylebox_type_list", [])
 
 def set_font(
   self: Godot.Object, name: String, theme_type: String, font: Godot.Object
@@ -126,11 +128,13 @@ def clear_font(
 ) -> IO(Unit):
   Godot.run(self, "clear_font", [Godot.VStr{name}, Godot.VStr{theme_type}])
 
-def get_font_list(self: Godot.Object, theme_type: String) -> IO(Godot.Variant):
-  Godot.call(self, "get_font_list", [Godot.VStr{theme_type}])
+def get_font_list(
+  self: Godot.Object, theme_type: String
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_font_list", [Godot.VStr{theme_type}])
 
-def get_font_type_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_font_type_list", [])
+def get_font_type_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_font_type_list", [])
 
 def set_font_size(
   self: Godot.Object, name: String, theme_type: String, font_size: U32
@@ -163,11 +167,11 @@ def clear_font_size(
 
 def get_font_size_list(
   self: Godot.Object, theme_type: String
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_font_size_list", [Godot.VStr{theme_type}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_font_size_list", [Godot.VStr{theme_type}])
 
-def get_font_size_type_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_font_size_type_list", [])
+def get_font_size_type_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_font_size_type_list", [])
 
 def set_color(
   self: Godot.Object, name: String, theme_type: String, color: Godot.Color
@@ -195,11 +199,13 @@ def clear_color(
 ) -> IO(Unit):
   Godot.run(self, "clear_color", [Godot.VStr{name}, Godot.VStr{theme_type}])
 
-def get_color_list(self: Godot.Object, theme_type: String) -> IO(Godot.Variant):
-  Godot.call(self, "get_color_list", [Godot.VStr{theme_type}])
+def get_color_list(
+  self: Godot.Object, theme_type: String
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_color_list", [Godot.VStr{theme_type}])
 
-def get_color_type_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_color_type_list", [])
+def get_color_type_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_color_type_list", [])
 
 def set_constant(
   self: Godot.Object, name: String, theme_type: String, constant: U32
@@ -232,11 +238,11 @@ def clear_constant(
 
 def get_constant_list(
   self: Godot.Object, theme_type: String
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_constant_list", [Godot.VStr{theme_type}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_constant_list", [Godot.VStr{theme_type}])
 
-def get_constant_type_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_constant_type_list", [])
+def get_constant_type_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_constant_type_list", [])
 
 def set_default_base_scale(self: Godot.Object, base_scale: F32) -> IO(Unit):
   Godot.run(self, "set_default_base_scale", [Godot.VFloat{base_scale}])
@@ -300,14 +306,14 @@ def clear_theme_item(
 
 def get_theme_item_list(
   self: Godot.Object, data_type: U32, theme_type: String
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_theme_item_list", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_theme_item_list", [
     Godot.VInt{data_type}, Godot.VStr{theme_type}])
 
 def get_theme_item_type_list(
   self: Godot.Object, data_type: U32
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_theme_item_type_list", [Godot.VInt{data_type}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_theme_item_type_list", [Godot.VInt{data_type}])
 
 def set_type_variation(
   self: Godot.Object, theme_type: String, base_type: String
@@ -331,8 +337,8 @@ def get_type_variation_base(
 
 def get_type_variation_list(
   self: Godot.Object, base_type: String
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_type_variation_list", [Godot.VStr{base_type}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_type_variation_list", [Godot.VStr{base_type}])
 
 def add_type(self: Godot.Object, theme_type: String) -> IO(Unit):
   Godot.run(self, "add_type", [Godot.VStr{theme_type}])
@@ -346,8 +352,8 @@ def rename_type(
   Godot.run(self, "rename_type", [
     Godot.VStr{old_theme_type}, Godot.VStr{theme_type}])
 
-def get_type_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_type_list", [])
+def get_type_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_type_list", [])
 
 def merge_with(self: Godot.Object, other: Godot.Object) -> IO(Unit):
   Godot.run(self, "merge_with", [Godot.VObj{other}])

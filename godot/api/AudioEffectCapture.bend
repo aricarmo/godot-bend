@@ -15,8 +15,8 @@ def new() -> IO(Godot.Object):
 def can_get_buffer(self: Godot.Object, frames: U32) -> IO(Bool):
   Godot.call_bool(self, "can_get_buffer", [Godot.VInt{frames}])
 
-def get_buffer(self: Godot.Object, frames: U32) -> IO(Godot.Variant):
-  Godot.call(self, "get_buffer", [Godot.VInt{frames}])
+def get_buffer(self: Godot.Object, frames: U32) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_buffer", [Godot.VInt{frames}])
 
 def clear_buffer(self: Godot.Object) -> IO(Unit):
   Godot.run(self, "clear_buffer", [])

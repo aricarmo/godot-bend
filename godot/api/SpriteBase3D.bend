@@ -135,8 +135,10 @@ def set_texture_filter(self: Godot.Object, mode: U32) -> IO(Unit):
 def get_texture_filter(self: Godot.Object) -> IO(U32):
   Godot.call_int(self, "get_texture_filter", [])
 
-def get_item_rect(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_item_rect", [])
+def get_item_rect(self: Godot.Object) -> IO(Godot.Rect2):
+  do IO<Godot.Rect2>:
+    v : Godot.Variant <- Godot.call(self, "get_item_rect", [])
+    return Godot.to_rect2(v)
 
 def generate_triangle_mesh(self: Godot.Object) -> IO(Godot.Object):
   Godot.call_obj(self, "generate_triangle_mesh", [])

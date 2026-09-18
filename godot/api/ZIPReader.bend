@@ -18,16 +18,17 @@ def open(self: Godot.Object, path: String) -> IO(U32):
 def close(self: Godot.Object) -> IO(U32):
   Godot.call_int(self, "close", [])
 
-def get_files(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_files", [])
+def get_files(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_files", [])
 
-def read_file(self: Godot.Object, path: String) -> IO(Godot.Variant):
-  Godot.call(self, "read_file", [Godot.VStr{path}])
+def read_file(self: Godot.Object, path: String) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "read_file", [Godot.VStr{path}])
 
 def read_file.all(
   self: Godot.Object, path: String, case_sensitive: Bool
-) -> IO(Godot.Variant):
-  Godot.call(self, "read_file", [Godot.VStr{path}, Godot.VBool{case_sensitive}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "read_file", [
+    Godot.VStr{path}, Godot.VBool{case_sensitive}])
 
 def file_exists(self: Godot.Object, path: String) -> IO(Bool):
   Godot.call_bool(self, "file_exists", [Godot.VStr{path}])

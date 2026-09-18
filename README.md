@@ -25,7 +25,7 @@ def main() -> IO(Unit):
 **Status: early, and working.** A Bend program compiles into a GDExtension
 library, Godot loads it, and the program runs frame by frame inside the
 engine. Every Godot class has a generated Bend file of typed methods
-(12,834 of them), over a dynamic core that calls any method by name, as
+(14,931 of them, every one that is not virtual but three), over a dynamic core that calls any method by name, as
 GDScript's `obj.call(..)` does, and the program hears signals and input.
 There is a [Pong](pong/main.bend) written in it. Tested with Godot 4.6.3 on
 macOS arm64.
@@ -39,9 +39,13 @@ compiles only the defs a program reaches.
 
 - A method is a def that takes the object first:
   `Node2D.set_position(sprite, Godot.Vec2{1.0, 2.0})`,
-  `Node.get_name(node) : IO(String)`. `bool`, `int`, `float`, strings,
-  `Vector2`, `Vector3`, `Color`, arrays, enums and objects are typed; an
-  answer of a kind not carried yet is a raw `Godot.Variant`.
+  `Node.get_name(node) : IO(String)`. Numbers, strings, vectors, colors,
+  rects, transforms, quaternions, RIDs, arrays, enums and objects are typed
+  (`Godot.Vec2`, `Godot.Transform3D`, `Godot.Rid`, ..). A `Dictionary` and the
+  rarer structs (`Vector4`, `Plane`, `AABB`, `Projection`) go as the raw
+  `Godot.Variant`, a packed array as a `List<&2, Godot.Variant>`.
+- A `Callable` argument is a tag: `Tween.tween_callback(tween, 77)` makes the
+  tween's call arrive in `Godot.signals()` as a signal tagged 77.
 - Objects are one type, `Godot.Object`, since Bend has no subtyping. So an
   inherited method is called from its own class's file, on any object:
   `Node2D.set_position` takes a `Sprite2D` as it is.
@@ -58,9 +62,9 @@ compiles only the defs a program reaches.
   these are effects, worth it for what only the engine knows.
 
 A wrapper adds the types and nothing else; the call still goes by name
-through the dynamic core. About 2,100 methods are left out for now, the ones
-with an argument that is a `RID`, a `Dictionary`, a transform or a packed
-array, as are virtual ones. Each file's header counts its own.
+through the dynamic core. What is left out: virtual methods (a program
+cannot override one yet) and three with a `Signal` argument. Each file's
+header counts its own.
 
 To regenerate, for another Godot version:
 
@@ -91,10 +95,19 @@ out:
 
 A `Variant` is `VNil`, `VBool`, `VInt`, `VFloat`, `VStr` (also what a
 `StringName` or `NodePath` arrives as), `VVec2`, `VVec3`, `VColor`, `VArr`
-(a `List<&2, Variant>`, nested as deep as 32), `VObj`, or `VOther` for a kind
-not carried yet. Bend has no signed integer, so a `VInt` is a 32-bit window in
+(a `List<&2, Variant>`, nested as deep as 32; a packed array arrives as one
+too), `VDict` (key, value, key, value), `VRid`, `VObj`, `VFloats` and `VInts`
+(Godot's numeric structs, by Variant type and their numbers in memory order:
+`VFloats{12, [x, y, z, w]}` is a Vector4), or `VOther` for the few kinds not
+carried (a Signal, a Callable that comes back). Two kinds only go in:
+`VPacked{type, items}`, a packed array, and `VCall{tag}`, a Callable that
+queues a signal. Bend has no signed integer, so a `VInt` is a 32-bit window in
 two's complement: Godot's `-1` arrives as `4294967295`, and that goes back as
 `-1`. Lists of Variants are `List<&2, Variant>`, the copyable kind.
+
+`Godot.bend` names the common structs (`Rect2`, `Transform2D`, `Basis`,
+`Transform3D`, `Quaternion`, ..) over those, with a `Basis` as its three axes,
+as in GDScript, though Godot stores rows.
 
 An `Object` is a handle by instance id, never a pointer: it copies freely, and
 a call on a freed object logs an error in Godot and answers `VNil` instead of
@@ -234,7 +247,9 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] A dynamic core: `Godot.call(object, method, args)`, get/set property,
       node lookup, instantiate, singletons
 - [x] More `Variant` kinds: Vector3, Color, nested arrays, negative ints
-- [ ] Dictionaries, transforms, packed arrays, ints past 32 bits
+- [x] Dictionaries, RIDs, transforms and the other numeric structs, packed
+      arrays, Callables as signal tags
+- [ ] Ints past 32 bits; virtual methods (overriding `_draw`, `_physics_process`)
 - [x] Signals delivered to the program as a queue; input by polling
 - [x] A game: Pong
 - [x] `_input` events as values; GDScript into a running program, by signal

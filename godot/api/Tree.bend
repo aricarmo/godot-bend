@@ -144,19 +144,24 @@ def edit_selected(self: Godot.Object) -> IO(Bool):
 def edit_selected.all(self: Godot.Object, force_edit: Bool) -> IO(Bool):
   Godot.call_bool(self, "edit_selected", [Godot.VBool{force_edit}])
 
-def get_custom_popup_rect(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_custom_popup_rect", [])
+def get_custom_popup_rect(self: Godot.Object) -> IO(Godot.Rect2):
+  do IO<Godot.Rect2>:
+    v : Godot.Variant <- Godot.call(self, "get_custom_popup_rect", [])
+    return Godot.to_rect2(v)
 
 def get_item_area_rect(
   self: Godot.Object, item: Godot.Object
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_item_area_rect", [Godot.VObj{item}])
+) -> IO(Godot.Rect2):
+  do IO<Godot.Rect2>:
+    v : Godot.Variant <- Godot.call(self, "get_item_area_rect", [Godot.VObj{item}])
+    return Godot.to_rect2(v)
 
 def get_item_area_rect.all(
   self: Godot.Object, item: Godot.Object, column: U32, button_index: U32
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_item_area_rect", [
-    Godot.VObj{item}, Godot.VInt{column}, Godot.VInt{button_index}])
+) -> IO(Godot.Rect2):
+  do IO<Godot.Rect2>:
+    v : Godot.Variant <- Godot.call(self, "get_item_area_rect", [Godot.VObj{item}, Godot.VInt{column}, Godot.VInt{button_index}])
+    return Godot.to_rect2(v)
 
 def get_item_at_position(
   self: Godot.Object, position: Godot.Vec2

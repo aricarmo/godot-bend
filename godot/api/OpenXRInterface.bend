@@ -271,9 +271,10 @@ def get_hand_joint_flags(self: Godot.Object, hand: U32, joint: U32) -> IO(U32):
 
 def get_hand_joint_rotation(
   self: Godot.Object, hand: U32, joint: U32
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_hand_joint_rotation", [
-    Godot.VInt{hand}, Godot.VInt{joint}])
+) -> IO(Godot.Quaternion):
+  do IO<Godot.Quaternion>:
+    v : Godot.Variant <- Godot.call(self, "get_hand_joint_rotation", [Godot.VInt{hand}, Godot.VInt{joint}])
+    return Godot.to_quaternion(v)
 
 def get_hand_joint_position(
   self: Godot.Object, hand: U32, joint: U32

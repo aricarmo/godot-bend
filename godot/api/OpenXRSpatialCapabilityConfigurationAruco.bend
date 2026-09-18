@@ -60,8 +60,8 @@ def ARUCO_DICT_7X7_250() -> U32:
 def ARUCO_DICT_7X7_1000() -> U32:
   16
 
-def get_enabled_components(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_enabled_components", [])
+def get_enabled_components(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_enabled_components", [])
 
 def set_aruco_dict(self: Godot.Object, aruco_dict: U32) -> IO(Unit):
   Godot.run(self, "set_aruco_dict", [Godot.VInt{aruco_dict}])

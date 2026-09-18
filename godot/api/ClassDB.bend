@@ -30,13 +30,13 @@ def API_EDITOR_EXTENSION() -> U32:
 def API_NONE() -> U32:
   4
 
-def get_class_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_class_list", [])
+def get_class_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_class_list", [])
 
 def get_inheriters_from_class(
   self: Godot.Object, class: String
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_inheriters_from_class", [Godot.VStr{class}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_inheriters_from_class", [Godot.VStr{class}])
 
 def get_parent_class(self: Godot.Object, class: String) -> IO(String):
   Godot.call_str(self, "get_parent_class", [Godot.VStr{class}])
@@ -167,13 +167,13 @@ def class_call_static(
 
 def class_get_integer_constant_list(
   self: Godot.Object, class: String
-) -> IO(Godot.Variant):
-  Godot.call(self, "class_get_integer_constant_list", [Godot.VStr{class}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "class_get_integer_constant_list", [Godot.VStr{class}])
 
 def class_get_integer_constant_list.all(
   self: Godot.Object, class: String, no_inheritance: Bool
-) -> IO(Godot.Variant):
-  Godot.call(self, "class_get_integer_constant_list", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "class_get_integer_constant_list", [
     Godot.VStr{class}, Godot.VBool{no_inheritance}])
 
 def class_has_integer_constant(
@@ -197,25 +197,27 @@ def class_has_enum.all(
   Godot.call_bool(self, "class_has_enum", [
     Godot.VStr{class}, Godot.VStr{name}, Godot.VBool{no_inheritance}])
 
-def class_get_enum_list(self: Godot.Object, class: String) -> IO(Godot.Variant):
-  Godot.call(self, "class_get_enum_list", [Godot.VStr{class}])
+def class_get_enum_list(
+  self: Godot.Object, class: String
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "class_get_enum_list", [Godot.VStr{class}])
 
 def class_get_enum_list.all(
   self: Godot.Object, class: String, no_inheritance: Bool
-) -> IO(Godot.Variant):
-  Godot.call(self, "class_get_enum_list", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "class_get_enum_list", [
     Godot.VStr{class}, Godot.VBool{no_inheritance}])
 
 def class_get_enum_constants(
   self: Godot.Object, class: String, enum: String
-) -> IO(Godot.Variant):
-  Godot.call(self, "class_get_enum_constants", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "class_get_enum_constants", [
     Godot.VStr{class}, Godot.VStr{enum}])
 
 def class_get_enum_constants.all(
   self: Godot.Object, class: String, enum: String, no_inheritance: Bool
-) -> IO(Godot.Variant):
-  Godot.call(self, "class_get_enum_constants", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "class_get_enum_constants", [
     Godot.VStr{class}, Godot.VStr{enum}, Godot.VBool{no_inheritance}])
 
 def class_get_integer_constant_enum(

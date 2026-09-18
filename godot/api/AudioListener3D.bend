@@ -30,8 +30,10 @@ def clear_current(self: Godot.Object) -> IO(Unit):
 def is_current(self: Godot.Object) -> IO(Bool):
   Godot.call_bool(self, "is_current", [])
 
-def get_listener_transform(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_listener_transform", [])
+def get_listener_transform(self: Godot.Object) -> IO(Godot.Transform3D):
+  do IO<Godot.Transform3D>:
+    v : Godot.Variant <- Godot.call(self, "get_listener_transform", [])
+    return Godot.to_transform3d(v)
 
 def set_doppler_tracking(self: Godot.Object, mode: U32) -> IO(Unit):
   Godot.run(self, "set_doppler_tracking", [Godot.VInt{mode}])

@@ -9,8 +9,10 @@
 import Base
 import ../Godot.bend as Godot
 
-def get_cam_transform(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_cam_transform", [])
+def get_cam_transform(self: Godot.Object) -> IO(Godot.Transform3D):
+  do IO<Godot.Transform3D>:
+    v : Godot.Variant <- Godot.call(self, "get_cam_transform", [])
+    return Godot.to_transform3d(v)
 
 def get_cam_projection(self: Godot.Object) -> IO(Godot.Variant):
   Godot.call(self, "get_cam_projection", [])
@@ -24,5 +26,7 @@ def get_view_eye_offset(self: Godot.Object, view: U32) -> IO(Godot.Vec3):
 def get_view_projection(self: Godot.Object, view: U32) -> IO(Godot.Variant):
   Godot.call(self, "get_view_projection", [Godot.VInt{view}])
 
-def get_uniform_buffer(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_uniform_buffer", [])
+def get_uniform_buffer(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_uniform_buffer", [])
+    return Godot.to_rid(v)

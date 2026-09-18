@@ -12,5 +12,7 @@ import ../Godot.bend as Godot
 def new() -> IO(Godot.Object):
   Godot.new("OpenXRSpatialComponentAnchorList")
 
-def get_entity_pose(self: Godot.Object, index: U32) -> IO(Godot.Variant):
-  Godot.call(self, "get_entity_pose", [Godot.VInt{index}])
+def get_entity_pose(self: Godot.Object, index: U32) -> IO(Godot.Transform3D):
+  do IO<Godot.Transform3D>:
+    v : Godot.Variant <- Godot.call(self, "get_entity_pose", [Godot.VInt{index}])
+    return Godot.to_transform3d(v)

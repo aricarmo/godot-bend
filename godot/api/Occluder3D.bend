@@ -9,8 +9,8 @@
 import Base
 import ../Godot.bend as Godot
 
-def get_vertices(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_vertices", [])
+def get_vertices(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_vertices", [])
 
-def get_indices(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_indices", [])
+def get_indices(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_indices", [])

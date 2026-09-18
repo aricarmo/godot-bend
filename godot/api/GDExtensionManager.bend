@@ -39,8 +39,8 @@ def unload_extension(self: Godot.Object, path: String) -> IO(U32):
 def is_extension_loaded(self: Godot.Object, path: String) -> IO(Bool):
   Godot.call_bool(self, "is_extension_loaded", [Godot.VStr{path}])
 
-def get_loaded_extensions(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_loaded_extensions", [])
+def get_loaded_extensions(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_loaded_extensions", [])
 
 def get_extension(self: Godot.Object, path: String) -> IO(Godot.Object):
   Godot.call_obj(self, "get_extension", [Godot.VStr{path}])

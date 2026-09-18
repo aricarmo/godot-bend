@@ -57,8 +57,10 @@ def get_node_instance_placeholder(self: Godot.Object, idx: U32) -> IO(String):
 def get_node_instance(self: Godot.Object, idx: U32) -> IO(Godot.Object):
   Godot.call_obj(self, "get_node_instance", [Godot.VInt{idx}])
 
-def get_node_groups(self: Godot.Object, idx: U32) -> IO(Godot.Variant):
-  Godot.call(self, "get_node_groups", [Godot.VInt{idx}])
+def get_node_groups(
+  self: Godot.Object, idx: U32
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_node_groups", [Godot.VInt{idx}])
 
 def get_node_index(self: Godot.Object, idx: U32) -> IO(U32):
   Godot.call_int(self, "get_node_index", [Godot.VInt{idx}])

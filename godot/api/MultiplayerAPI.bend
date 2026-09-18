@@ -65,8 +65,8 @@ def object_configuration_remove(
   Godot.call_int(self, "object_configuration_remove", [
     Godot.VObj{object}, configuration])
 
-def get_peers(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_peers", [])
+def get_peers(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_peers", [])
 
 def set_default_interface(interface_name: String) -> IO(Unit):
   Godot.done(Godot.static("MultiplayerAPI", "set_default_interface", 3304788590, [Godot.VStr{interface_name}]))

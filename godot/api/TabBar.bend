@@ -173,8 +173,10 @@ def get_offset_buttons_visible(self: Godot.Object) -> IO(Bool):
 def ensure_tab_visible(self: Godot.Object, idx: U32) -> IO(Unit):
   Godot.run(self, "ensure_tab_visible", [Godot.VInt{idx}])
 
-def get_tab_rect(self: Godot.Object, tab_idx: U32) -> IO(Godot.Variant):
-  Godot.call(self, "get_tab_rect", [Godot.VInt{tab_idx}])
+def get_tab_rect(self: Godot.Object, tab_idx: U32) -> IO(Godot.Rect2):
+  do IO<Godot.Rect2>:
+    v : Godot.Variant <- Godot.call(self, "get_tab_rect", [Godot.VInt{tab_idx}])
+    return Godot.to_rect2(v)
 
 def move_tab(self: Godot.Object, from: U32, to: U32) -> IO(Unit):
   Godot.run(self, "move_tab", [Godot.VInt{from}, Godot.VInt{to}])

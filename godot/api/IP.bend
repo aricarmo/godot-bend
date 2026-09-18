@@ -53,13 +53,13 @@ def resolve_hostname.all(
 
 def resolve_hostname_addresses(
   self: Godot.Object, host: String
-) -> IO(Godot.Variant):
-  Godot.call(self, "resolve_hostname_addresses", [Godot.VStr{host}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "resolve_hostname_addresses", [Godot.VStr{host}])
 
 def resolve_hostname_addresses.all(
   self: Godot.Object, host: String, ip_type: U32
-) -> IO(Godot.Variant):
-  Godot.call(self, "resolve_hostname_addresses", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "resolve_hostname_addresses", [
     Godot.VStr{host}, Godot.VInt{ip_type}])
 
 def resolve_hostname_queue_item(self: Godot.Object, host: String) -> IO(U32):
@@ -85,8 +85,8 @@ def get_resolve_item_addresses(
 def erase_resolve_item(self: Godot.Object, id: U32) -> IO(Unit):
   Godot.run(self, "erase_resolve_item", [Godot.VInt{id}])
 
-def get_local_addresses(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_local_addresses", [])
+def get_local_addresses(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_local_addresses", [])
 
 def get_local_interfaces(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
   Godot.call_list(self, "get_local_interfaces", [])

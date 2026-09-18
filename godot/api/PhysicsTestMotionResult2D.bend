@@ -30,8 +30,10 @@ def get_collider_velocity(self: Godot.Object) -> IO(Godot.Vec2):
 def get_collider_id(self: Godot.Object) -> IO(U32):
   Godot.call_int(self, "get_collider_id", [])
 
-def get_collider_rid(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_collider_rid", [])
+def get_collider_rid(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_collider_rid", [])
+    return Godot.to_rid(v)
 
 def get_collider(self: Godot.Object) -> IO(Godot.Object):
   Godot.call_obj(self, "get_collider", [])

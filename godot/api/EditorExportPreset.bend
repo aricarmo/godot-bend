@@ -48,8 +48,8 @@ def MODE_SCRIPT_BINARY_TOKENS_COMPRESSED() -> U32:
 def has(self: Godot.Object, property: String) -> IO(Bool):
   Godot.call_bool(self, "has", [Godot.VStr{property}])
 
-def get_files_to_export(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_files_to_export", [])
+def get_files_to_export(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_files_to_export", [])
 
 def get_customized_files(self: Godot.Object) -> IO(Godot.Variant):
   Godot.call(self, "get_customized_files", [])
@@ -96,8 +96,8 @@ def get_exclude_filter(self: Godot.Object) -> IO(String):
 def get_custom_features(self: Godot.Object) -> IO(String):
   Godot.call_str(self, "get_custom_features", [])
 
-def get_patches(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_patches", [])
+def get_patches(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_patches", [])
 
 def get_export_path(self: Godot.Object) -> IO(String):
   Godot.call_str(self, "get_export_path", [])

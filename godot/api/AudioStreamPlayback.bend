@@ -22,8 +22,9 @@ def get_sample_playback(self: Godot.Object) -> IO(Godot.Object):
 
 def mix_audio(
   self: Godot.Object, rate_scale: F32, frames: U32
-) -> IO(Godot.Variant):
-  Godot.call(self, "mix_audio", [Godot.VFloat{rate_scale}, Godot.VInt{frames}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "mix_audio", [
+    Godot.VFloat{rate_scale}, Godot.VInt{frames}])
 
 def start(self: Godot.Object) -> IO(Unit):
   Godot.run(self, "start", [])

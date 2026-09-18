@@ -15,8 +15,8 @@ def get_current_editor(self: Godot.Object) -> IO(Godot.Object):
 def get_open_script_editors(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
   Godot.call_list(self, "get_open_script_editors", [])
 
-def get_breakpoints(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_breakpoints", [])
+def get_breakpoints(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_breakpoints", [])
 
 def register_syntax_highlighter(
   self: Godot.Object, syntax_highlighter: Godot.Object

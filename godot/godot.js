@@ -105,3 +105,33 @@ function gd_util(name, hash, sig) {
   gd_stack.length -= sig.indexOf(">");
   return gd_put(0n, null);
 }
+
+function gd_pack(kind, n) {
+  const nums = gd_stack.splice(gd_stack.length - Number(n)).map((x) => x[1]);
+  const ints = [6, 8, 10, 13].includes(Number(kind));
+  return gd_put(ints ? 12n : 11n, [kind, nums]);
+}
+
+function gd_unpack() {
+  const [kind, nums] = gd_take();
+  const ints = [6, 8, 10, 13].includes(Number(kind));
+  nums.forEach((x) => gd_put(ints ? 2n : 3n, x));
+  gd_put(2n, nums.length);
+  return kind;
+}
+
+function gd_push_rid(hi, lo)     { return gd_put(13n, [hi, lo]); }
+function gd_pop_rid()            { const r = gd_take(); return io_tup(r[0], r[1]); }
+function gd_push_callable(tag)   { return gd_put(10n, null); }
+function gd_packed_new(kind, n)  { return gd_array_new(n); }
+
+function gd_dict_new(n) {
+  const items = gd_stack.splice(gd_stack.length - Number(n));
+  return gd_put(14n, items);
+}
+
+function gd_dict_open() {
+  const items = gd_take();
+  gd_stack.push(...items);
+  return items.length;
+}

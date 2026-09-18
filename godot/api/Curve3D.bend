@@ -100,14 +100,17 @@ def sample_baked.all(
   Godot.call_vec3(self, "sample_baked", [
     Godot.VFloat{offset}, Godot.VBool{cubic}])
 
-def sample_baked_with_rotation(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "sample_baked_with_rotation", [])
+def sample_baked_with_rotation(self: Godot.Object) -> IO(Godot.Transform3D):
+  do IO<Godot.Transform3D>:
+    v : Godot.Variant <- Godot.call(self, "sample_baked_with_rotation", [])
+    return Godot.to_transform3d(v)
 
 def sample_baked_with_rotation.all(
   self: Godot.Object, offset: F32, cubic: Bool, apply_tilt: Bool
-) -> IO(Godot.Variant):
-  Godot.call(self, "sample_baked_with_rotation", [
-    Godot.VFloat{offset}, Godot.VBool{cubic}, Godot.VBool{apply_tilt}])
+) -> IO(Godot.Transform3D):
+  do IO<Godot.Transform3D>:
+    v : Godot.Variant <- Godot.call(self, "sample_baked_with_rotation", [Godot.VFloat{offset}, Godot.VBool{cubic}, Godot.VBool{apply_tilt}])
+    return Godot.to_transform3d(v)
 
 def sample_baked_up_vector(self: Godot.Object, offset: F32) -> IO(Godot.Vec3):
   Godot.call_vec3(self, "sample_baked_up_vector", [Godot.VFloat{offset}])
@@ -118,14 +121,14 @@ def sample_baked_up_vector.all(
   Godot.call_vec3(self, "sample_baked_up_vector", [
     Godot.VFloat{offset}, Godot.VBool{apply_tilt}])
 
-def get_baked_points(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_baked_points", [])
+def get_baked_points(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_baked_points", [])
 
-def get_baked_tilts(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_baked_tilts", [])
+def get_baked_tilts(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_baked_tilts", [])
 
-def get_baked_up_vectors(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_baked_up_vectors", [])
+def get_baked_up_vectors(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_baked_up_vectors", [])
 
 def get_closest_point(
   self: Godot.Object, to_point: Godot.Vec3
@@ -135,20 +138,20 @@ def get_closest_point(
 def get_closest_offset(self: Godot.Object, to_point: Godot.Vec3) -> IO(F32):
   Godot.call_float(self, "get_closest_offset", [Godot.vec3(to_point)])
 
-def tessellate(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "tessellate", [])
+def tessellate(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "tessellate", [])
 
 def tessellate.all(
   self: Godot.Object, max_stages: U32, tolerance_degrees: F32
-) -> IO(Godot.Variant):
-  Godot.call(self, "tessellate", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "tessellate", [
     Godot.VInt{max_stages}, Godot.VFloat{tolerance_degrees}])
 
-def tessellate_even_length(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "tessellate_even_length", [])
+def tessellate_even_length(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "tessellate_even_length", [])
 
 def tessellate_even_length.all(
   self: Godot.Object, max_stages: U32, tolerance_length: F32
-) -> IO(Godot.Variant):
-  Godot.call(self, "tessellate_even_length", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "tessellate_even_length", [
     Godot.VInt{max_stages}, Godot.VFloat{tolerance_length}])

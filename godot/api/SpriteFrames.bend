@@ -32,8 +32,8 @@ def rename_animation(
 ) -> IO(Unit):
   Godot.run(self, "rename_animation", [Godot.VStr{anim}, Godot.VStr{newname}])
 
-def get_animation_names(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_animation_names", [])
+def get_animation_names(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_animation_names", [])
 
 def set_animation_speed(self: Godot.Object, anim: String, fps: F32) -> IO(Unit):
   Godot.run(self, "set_animation_speed", [Godot.VStr{anim}, Godot.VFloat{fps}])

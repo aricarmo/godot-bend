@@ -138,8 +138,8 @@ def erase_transition(
   Godot.run(self, "erase_transition", [
     Godot.VInt{from_clip}, Godot.VInt{to_clip}])
 
-def get_transition_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_transition_list", [])
+def get_transition_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_transition_list", [])
 
 def get_transition_from_time(
   self: Godot.Object, from_clip: U32, to_clip: U32

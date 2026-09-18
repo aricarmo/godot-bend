@@ -21,5 +21,5 @@ def supports_polygons(self: Godot.Object) -> IO(Bool):
 def supports_labels(self: Godot.Object) -> IO(Bool):
   Godot.call_bool(self, "supports_labels", [])
 
-def get_enabled_components(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_enabled_components", [])
+def get_enabled_components(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_enabled_components", [])

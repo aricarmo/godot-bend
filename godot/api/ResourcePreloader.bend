@@ -31,5 +31,5 @@ def has_resource(self: Godot.Object, name: String) -> IO(Bool):
 def get_resource(self: Godot.Object, name: String) -> IO(Godot.Object):
   Godot.call_obj(self, "get_resource", [Godot.VStr{name}])
 
-def get_resource_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_resource_list", [])
+def get_resource_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_resource_list", [])

@@ -110,8 +110,8 @@ def register_singleton(
 def unregister_singleton(self: Godot.Object, name: String) -> IO(Unit):
   Godot.run(self, "unregister_singleton", [Godot.VStr{name}])
 
-def get_singleton_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_singleton_list", [])
+def get_singleton_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_singleton_list", [])
 
 def register_script_language(
   self: Godot.Object, language: Godot.Object

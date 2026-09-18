@@ -12,14 +12,20 @@ import ../Godot.bend as Godot
 def new() -> IO(Godot.Object):
   Godot.new("World2D")
 
-def get_canvas(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_canvas", [])
+def get_canvas(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_canvas", [])
+    return Godot.to_rid(v)
 
-def get_navigation_map(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_navigation_map", [])
+def get_navigation_map(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_navigation_map", [])
+    return Godot.to_rid(v)
 
-def get_space(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_space", [])
+def get_space(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_space", [])
+    return Godot.to_rid(v)
 
 def get_direct_space_state(self: Godot.Object) -> IO(Godot.Object):
   Godot.call_obj(self, "get_direct_space_state", [])

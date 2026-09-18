@@ -206,8 +206,8 @@ def get_input_mix_rate(self: Godot.Object) -> IO(F32):
 def get_driver_name(self: Godot.Object) -> IO(String):
   Godot.call_str(self, "get_driver_name", [])
 
-def get_output_device_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_output_device_list", [])
+def get_output_device_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_output_device_list", [])
 
 def get_output_device(self: Godot.Object) -> IO(String):
   Godot.call_str(self, "get_output_device", [])
@@ -224,8 +224,8 @@ def get_time_since_last_mix(self: Godot.Object) -> IO(F32):
 def get_output_latency(self: Godot.Object) -> IO(F32):
   Godot.call_float(self, "get_output_latency", [])
 
-def get_input_device_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_input_device_list", [])
+def get_input_device_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_input_device_list", [])
 
 def get_input_device(self: Godot.Object) -> IO(String):
   Godot.call_str(self, "get_input_device", [])
@@ -242,8 +242,10 @@ def get_input_frames_available(self: Godot.Object) -> IO(U32):
 def get_input_buffer_length_frames(self: Godot.Object) -> IO(U32):
   Godot.call_int(self, "get_input_buffer_length_frames", [])
 
-def get_input_frames(self: Godot.Object, frames: U32) -> IO(Godot.Variant):
-  Godot.call(self, "get_input_frames", [Godot.VInt{frames}])
+def get_input_frames(
+  self: Godot.Object, frames: U32
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_input_frames", [Godot.VInt{frames}])
 
 def set_bus_layout(self: Godot.Object, bus_layout: Godot.Object) -> IO(Unit):
   Godot.run(self, "set_bus_layout", [Godot.VObj{bus_layout}])

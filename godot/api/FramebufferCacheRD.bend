@@ -14,5 +14,7 @@ def new() -> IO(Godot.Object):
 
 def get_cache_multipass(
   textures: List<&2, Godot.Variant>, passes: List<&2, Godot.Variant>, views: U32
-) -> IO(Godot.Variant):
-  Godot.static("FramebufferCacheRD", "get_cache_multipass", 3437881813, [Godot.VArr{textures}, Godot.VArr{passes}, Godot.VInt{views}])
+) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.static("FramebufferCacheRD", "get_cache_multipass", 3437881813, [Godot.VArr{textures}, Godot.VArr{passes}, Godot.VInt{views}])
+    return Godot.to_rid(v)

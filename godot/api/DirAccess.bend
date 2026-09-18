@@ -41,17 +41,21 @@ def current_is_dir(self: Godot.Object) -> IO(Bool):
 def list_dir_end(self: Godot.Object) -> IO(Unit):
   Godot.run(self, "list_dir_end", [])
 
-def get_files(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_files", [])
+def get_files(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_files", [])
 
-def get_files_at(path: String) -> IO(Godot.Variant):
-  Godot.static("DirAccess", "get_files_at", 3538744774, [Godot.VStr{path}])
+def get_files_at(path: String) -> IO(List<&2, Godot.Variant>):
+  do IO<List<&2, Godot.Variant>>:
+    v : Godot.Variant <- Godot.static("DirAccess", "get_files_at", 3538744774, [Godot.VStr{path}])
+    return Godot.to_list(v)
 
-def get_directories(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_directories", [])
+def get_directories(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_directories", [])
 
-def get_directories_at(path: String) -> IO(Godot.Variant):
-  Godot.static("DirAccess", "get_directories_at", 3538744774, [Godot.VStr{path}])
+def get_directories_at(path: String) -> IO(List<&2, Godot.Variant>):
+  do IO<List<&2, Godot.Variant>>:
+    v : Godot.Variant <- Godot.static("DirAccess", "get_directories_at", 3538744774, [Godot.VStr{path}])
+    return Godot.to_list(v)
 
 def get_drive_count() -> IO(U32):
   do IO<U32>:

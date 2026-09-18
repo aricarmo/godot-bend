@@ -65,8 +65,8 @@ def has_animation(self: Godot.Object, name: String) -> IO(Bool):
 def get_animation(self: Godot.Object, name: String) -> IO(Godot.Object):
   Godot.call_obj(self, "get_animation", [Godot.VStr{name}])
 
-def get_animation_list(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_animation_list", [])
+def get_animation_list(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_animation_list", [])
 
 def set_active(self: Godot.Object, active: Bool) -> IO(Unit):
   Godot.run(self, "set_active", [Godot.VBool{active}])
@@ -125,8 +125,10 @@ def is_root_motion_local(self: Godot.Object) -> IO(Bool):
 def get_root_motion_position(self: Godot.Object) -> IO(Godot.Vec3):
   Godot.call_vec3(self, "get_root_motion_position", [])
 
-def get_root_motion_rotation(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_root_motion_rotation", [])
+def get_root_motion_rotation(self: Godot.Object) -> IO(Godot.Quaternion):
+  do IO<Godot.Quaternion>:
+    v : Godot.Variant <- Godot.call(self, "get_root_motion_rotation", [])
+    return Godot.to_quaternion(v)
 
 def get_root_motion_scale(self: Godot.Object) -> IO(Godot.Vec3):
   Godot.call_vec3(self, "get_root_motion_scale", [])
@@ -136,8 +138,10 @@ def get_root_motion_position_accumulator(self: Godot.Object) -> IO(Godot.Vec3):
 
 def get_root_motion_rotation_accumulator(
   self: Godot.Object
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_root_motion_rotation_accumulator", [])
+) -> IO(Godot.Quaternion):
+  do IO<Godot.Quaternion>:
+    v : Godot.Variant <- Godot.call(self, "get_root_motion_rotation_accumulator", [])
+    return Godot.to_quaternion(v)
 
 def get_root_motion_scale_accumulator(self: Godot.Object) -> IO(Godot.Vec3):
   Godot.call_vec3(self, "get_root_motion_scale_accumulator", [])

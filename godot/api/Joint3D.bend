@@ -35,5 +35,7 @@ def set_exclude_nodes_from_collision(
 def get_exclude_nodes_from_collision(self: Godot.Object) -> IO(Bool):
   Godot.call_bool(self, "get_exclude_nodes_from_collision", [])
 
-def get_rid(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_rid", [])
+def get_rid(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_rid", [])
+    return Godot.to_rid(v)

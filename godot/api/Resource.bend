@@ -39,8 +39,10 @@ def set_name(self: Godot.Object, name: String) -> IO(Unit):
 def get_name(self: Godot.Object) -> IO(String):
   Godot.call_str(self, "get_name", [])
 
-def get_rid(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_rid", [])
+def get_rid(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_rid", [])
+    return Godot.to_rid(v)
 
 def set_local_to_scene(self: Godot.Object, enable: Bool) -> IO(Unit):
   Godot.run(self, "set_local_to_scene", [Godot.VBool{enable}])

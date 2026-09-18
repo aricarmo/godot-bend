@@ -12,8 +12,10 @@ import ../Godot.bend as Godot
 def new() -> IO(Godot.Object):
   Godot.new("ShaderIncludeDB")
 
-def list_built_in_include_files() -> IO(Godot.Variant):
-  Godot.static("ShaderIncludeDB", "list_built_in_include_files", 2981934095, [])
+def list_built_in_include_files() -> IO(List<&2, Godot.Variant>):
+  do IO<List<&2, Godot.Variant>>:
+    v : Godot.Variant <- Godot.static("ShaderIncludeDB", "list_built_in_include_files", 2981934095, [])
+    return Godot.to_list(v)
 
 def has_built_in_include_file(filename: String) -> IO(Bool):
   do IO<Bool>:

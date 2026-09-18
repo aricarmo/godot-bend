@@ -1,0 +1,11 @@
+transform2d: at 5 7, turned 1.5707964
+transform3d: x axis sends (1 0 0) to 1 3 1
+rect2i: ints 8: 1 2 30 40
+quaternion: floats 15: 0 0.5 0 1
+vector4: floats 12: 1 2 3 4
+dictionary: { 'a' 1 'b' [ 2 3 ] }
+packed strings: [ 'x' 'y' ]
+packed bytes: [ 7 255 ]
+rid: set
+the tween called: 77
+bend: done

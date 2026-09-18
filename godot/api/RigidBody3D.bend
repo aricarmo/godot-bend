@@ -81,8 +81,10 @@ def set_angular_velocity(
 def get_angular_velocity(self: Godot.Object) -> IO(Godot.Vec3):
   Godot.call_vec3(self, "get_angular_velocity", [])
 
-def get_inverse_inertia_tensor(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_inverse_inertia_tensor", [])
+def get_inverse_inertia_tensor(self: Godot.Object) -> IO(Godot.Basis):
+  do IO<Godot.Basis>:
+    v : Godot.Variant <- Godot.call(self, "get_inverse_inertia_tensor", [])
+    return Godot.to_basis(v)
 
 def set_gravity_scale(self: Godot.Object, gravity_scale: F32) -> IO(Unit):
   Godot.run(self, "set_gravity_scale", [Godot.VFloat{gravity_scale}])

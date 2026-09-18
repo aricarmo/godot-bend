@@ -69,13 +69,17 @@ def get_collider_id(self: Godot.Object) -> IO(U32):
 def get_collider_id.all(self: Godot.Object, collision_index: U32) -> IO(U32):
   Godot.call_int(self, "get_collider_id", [Godot.VInt{collision_index}])
 
-def get_collider_rid(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_collider_rid", [])
+def get_collider_rid(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_collider_rid", [])
+    return Godot.to_rid(v)
 
 def get_collider_rid.all(
   self: Godot.Object, collision_index: U32
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_collider_rid", [Godot.VInt{collision_index}])
+) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_collider_rid", [Godot.VInt{collision_index}])
+    return Godot.to_rid(v)
 
 def get_collider_shape(self: Godot.Object) -> IO(Godot.Object):
   Godot.call_obj(self, "get_collider_shape", [])

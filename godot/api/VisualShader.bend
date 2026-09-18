@@ -112,8 +112,10 @@ def get_node_position(
   Godot.call_vec2(self, "get_node_position", [
     Godot.VInt{type_}, Godot.VInt{id}])
 
-def get_node_list(self: Godot.Object, type_: U32) -> IO(Godot.Variant):
-  Godot.call(self, "get_node_list", [Godot.VInt{type_}])
+def get_node_list(
+  self: Godot.Object, type_: U32
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_node_list", [Godot.VInt{type_}])
 
 def get_valid_node_id(self: Godot.Object, type_: U32) -> IO(U32):
   Godot.call_int(self, "get_valid_node_id", [Godot.VInt{type_}])

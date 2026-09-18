@@ -15,8 +15,12 @@ def get_render_scene_buffers(self: Godot.Object) -> IO(Godot.Object):
 def get_render_scene_data(self: Godot.Object) -> IO(Godot.Object):
   Godot.call_obj(self, "get_render_scene_data", [])
 
-def get_environment(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_environment", [])
+def get_environment(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_environment", [])
+    return Godot.to_rid(v)
 
-def get_camera_attributes(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_camera_attributes", [])
+def get_camera_attributes(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_camera_attributes", [])
+    return Godot.to_rid(v)

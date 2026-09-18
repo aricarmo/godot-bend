@@ -18,8 +18,10 @@ def DISABLE_MODE_REMOVE() -> U32:
 def DISABLE_MODE_KEEP_ACTIVE() -> U32:
   1
 
-def get_physics_rid(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_physics_rid", [])
+def get_physics_rid(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_physics_rid", [])
+    return Godot.to_rid(v)
 
 def set_collision_mask(self: Godot.Object, collision_mask: U32) -> IO(Unit):
   Godot.run(self, "set_collision_mask", [Godot.VInt{collision_mask}])

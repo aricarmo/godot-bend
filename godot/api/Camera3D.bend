@@ -99,8 +99,10 @@ def set_current(self: Godot.Object, enabled: Bool) -> IO(Unit):
 def is_current(self: Godot.Object) -> IO(Bool):
   Godot.call_bool(self, "is_current", [])
 
-def get_camera_transform(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_camera_transform", [])
+def get_camera_transform(self: Godot.Object) -> IO(Godot.Transform3D):
+  do IO<Godot.Transform3D>:
+    v : Godot.Variant <- Godot.call(self, "get_camera_transform", [])
+    return Godot.to_transform3d(v)
 
 def get_camera_projection(self: Godot.Object) -> IO(Godot.Variant):
   Godot.call(self, "get_camera_projection", [])
@@ -197,11 +199,15 @@ def is_position_in_frustum(
 ) -> IO(Bool):
   Godot.call_bool(self, "is_position_in_frustum", [Godot.vec3(world_point)])
 
-def get_camera_rid(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_camera_rid", [])
+def get_camera_rid(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_camera_rid", [])
+    return Godot.to_rid(v)
 
-def get_pyramid_shape_rid(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_pyramid_shape_rid", [])
+def get_pyramid_shape_rid(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_pyramid_shape_rid", [])
+    return Godot.to_rid(v)
 
 def set_cull_mask_value(
   self: Godot.Object, layer_number: U32, value: Bool

@@ -120,8 +120,8 @@ def add_preset(self: Godot.Object, color: Godot.Color) -> IO(Unit):
 def erase_preset(self: Godot.Object, color: Godot.Color) -> IO(Unit):
   Godot.run(self, "erase_preset", [Godot.color(color)])
 
-def get_presets(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_presets", [])
+def get_presets(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_presets", [])
 
 def add_recent_preset(self: Godot.Object, color: Godot.Color) -> IO(Unit):
   Godot.run(self, "add_recent_preset", [Godot.color(color)])
@@ -129,8 +129,8 @@ def add_recent_preset(self: Godot.Object, color: Godot.Color) -> IO(Unit):
 def erase_recent_preset(self: Godot.Object, color: Godot.Color) -> IO(Unit):
   Godot.run(self, "erase_recent_preset", [Godot.color(color)])
 
-def get_recent_presets(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_recent_presets", [])
+def get_recent_presets(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_recent_presets", [])
 
 def set_picker_shape(self: Godot.Object, shape: U32) -> IO(Unit):
   Godot.run(self, "set_picker_shape", [Godot.VInt{shape}])

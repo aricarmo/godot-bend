@@ -86,6 +86,44 @@ def gd.array_open() -> IO(U32):
   import "./godot.c"
   import "./godot.js"
 
+# Godot's numeric structs (Rect2, Transform2D, Basis, ..) are flat runs of
+# numbers: pack folds the top n into a value of a Variant type, unpack
+# spreads one out, pushes how many, and answers the type.
+def gd.pack(kind: U32, n: U32) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
+def gd.unpack() -> IO(U32):
+  import "./godot.c"
+  import "./godot.js"
+
+def gd.push_rid(hi: U32, lo: U32) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
+def gd.pop_rid() -> IO(U32 & U32):
+  import "./godot.c"
+  import "./godot.js"
+
+# A Callable that queues a signal under the tag.
+def gd.push_callable(tag: U32) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
+# Folds the top n values into a packed array of a Variant type.
+def gd.packed_new(kind: U32, n: U32) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
+# A Dictionary from the top n values, key then value; and back, answering n.
+def gd.dict_new(n: U32) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
+def gd.dict_open() -> IO(U32):
+  import "./godot.c"
+  import "./godot.js"
+
 def gd.push_obj(slot: U32) -> IO(Unit):
   import "./godot.c"
   import "./godot.js"
@@ -95,7 +133,8 @@ def gd.call(slot: U32, method: String, argc: U32) -> IO(Unit):
   import "./godot.js"
 
 # The top's kind: 0 Nil, 1 Bool, 2 Int, 3 Float, 4 String, 5 Vector2,
-# 6 Object, 7 Vector3, 8 Color, 9 Array, 10 anything else.
+# 6 Object, 7 Vector3, 8 Color, 9 Array (or a packed array), 10 anything
+# else, 11 a struct of floats, 12 a struct of ints, 13 RID, 14 Dictionary.
 def gd.kind() -> IO(Nat):
   import "./godot.c"
   import "./godot.js"
@@ -178,6 +217,13 @@ def gd.event() -> IO(U32):
 # in two's complement: Godot's -1 arrives as 4294967295, and that goes back
 # as -1. Other is a kind this binding does not carry yet (dictionaries,
 # transforms, packed arrays, ..).
+#
+# VFloats and VInts are Godot's numeric structs, by Variant type and their
+# numbers in memory order (the Typed section below gives the common ones
+# names). A VDict lists key, value, key, value. Two kinds only go in: a
+# VPacked is a packed array of a Variant type (one comes back as a VArr),
+# and a VCall is a Callable that queues a signal under its tag, so a
+# callback handed to the engine arrives in signals().
 type Variant is Data:
   VNil{}
   VBool{v: Bool}
@@ -190,6 +236,12 @@ type Variant is Data:
   VArr{items: List<&2, Variant>}
   VObj{v: Object}
   VOther{}
+  VFloats{kind: U32, nums: List<&2, F32>}
+  VInts{kind: U32, nums: List<&2, U32>}
+  VRid{hi: U32, lo: U32}
+  VDict{flat: List<&2, Variant>}
+  VPacked{kind: U32, items: List<&2, Variant>}
+  VCall{tag: U32}
 
 def Variant.bit(b: Bool) -> U32:
   match b:
@@ -223,6 +275,46 @@ def Variant.vec3(p: F32 & F32 & F32) -> Variant:
 def Variant.color(p: F32 & F32 & F32 & F32) -> Variant:
   (r, g, b, a) = p
   VColor{r, g, b, a}
+
+def Variant.push_floats(ns: List<&2, F32>, n: U32) -> IO(U32):
+  match ns:
+    case []:
+      IO.pure(U32, n)
+    case x <> rest:
+      do IO<U32>:
+        gd.push_float(x)
+        Variant.push_floats(rest, (n + 1 : U32))
+
+def Variant.push_ints(ns: List<&2, U32>, n: U32) -> IO(U32):
+  match ns:
+    case []:
+      IO.pure(U32, n)
+    case x <> rest:
+      do IO<U32>:
+        gd.push_int(x)
+        Variant.push_ints(rest, (n + 1 : U32))
+
+def Variant.pop_floats(n: Nat, acc: List<&2, F32>) -> IO(List<&2, F32>):
+  match n:
+    case 0n:
+      IO.pure(List<&2, F32>, acc)
+    case 1n+p:
+      do IO<List<&2, F32>>:
+        x : F32 <- gd.pop_float()
+        Variant.pop_floats(p, x <> acc)
+
+def Variant.pop_ints(n: Nat, acc: List<&2, U32>) -> IO(List<&2, U32>):
+  match n:
+    case 0n:
+      IO.pure(List<&2, U32>, acc)
+    case 1n+p:
+      do IO<List<&2, U32>>:
+        x : U32 <- gd.pop_int()
+        Variant.pop_ints(p, x <> acc)
+
+def Variant.rid(p: U32 & U32) -> Variant:
+  (hi, lo) = p
+  VRid{hi, lo}
 
 # Pushes every value, first to last, and answers n plus how many. An
 # array's items go through the same def, since Bend has no mutual
@@ -276,6 +368,34 @@ def Variant.push_all(vs: List<&2, Variant>, n: U32) -> IO(U32):
       do IO<U32>:
         gd.push_nil()
         Variant.push_all(rest, (n + 1 : U32))
+    case VFloats{kind, nums} <> rest:
+      do IO<U32>:
+        k : U32 <- Variant.push_floats(nums, 0)
+        gd.pack(kind, k)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VInts{kind, nums} <> rest:
+      do IO<U32>:
+        k : U32 <- Variant.push_ints(nums, 0)
+        gd.pack(kind, k)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VRid{hi, lo} <> rest:
+      do IO<U32>:
+        gd.push_rid(hi, lo)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VDict{flat} <> rest:
+      do IO<U32>:
+        k : U32 <- Variant.push_all(flat, 0)
+        gd.dict_new(k)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VPacked{kind, items} <> rest:
+      do IO<U32>:
+        k : U32 <- Variant.push_all(items, 0)
+        gd.packed_new(kind, k)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VCall{tag} <> rest:
+      do IO<U32>:
+        gd.push_callable(tag)
+        Variant.push_all(rest, (n + 1 : U32))
 
 # Pops the top as its kind. An array's items are popped by items, which is
 # Variant.pop_n one level down, handed in because a def cannot name one below it.
@@ -324,15 +444,38 @@ def Variant.pop_as(
         n : U32 <- gd.array_open()
         vs : List<&2, Variant> <- items(U32.to_nat(n))
         return VArr{vs}
+    case 11n:
+      do IO<Variant>:
+        kind : U32 <- gd.unpack()
+        n : U32 <- gd.pop_int()
+        nums : List<&2, F32> <- Variant.pop_floats(U32.to_nat(n), [])
+        return VFloats{kind, nums}
+    case 12n:
+      do IO<Variant>:
+        kind : U32 <- gd.unpack()
+        n : U32 <- gd.pop_int()
+        nums : List<&2, U32> <- Variant.pop_ints(U32.to_nat(n), [])
+        return VInts{kind, nums}
+    case 13n:
+      do IO<Variant>:
+        p : U32 & U32 <- gd.pop_rid()
+        return Variant.rid(p)
+    case 14n:
+      do IO<Variant>:
+        n : U32 <- gd.dict_open()
+        vs : List<&2, Variant> <- items(U32.to_nat(n))
+        return VDict{vs}
     case other:
       do IO<Variant>:
         gd.pop()
         return VOther{}
 
-# At the nesting limit an array pops as Other.
+# At the nesting limit an array or a dictionary pops as Other.
 def Variant.flat(kind: Nat) -> Nat:
   match kind:
     case 9n:
+      10n
+    case 14n:
       10n
     case other:
       other
@@ -649,3 +792,138 @@ def done(m: IO(Variant)) -> IO(Unit):
   do IO<Unit>:
     gone : Variant <- m
     return Unit{}
+
+# Structs
+# -------
+
+# Names for the numeric structs a program meets most, over VFloats and
+# VInts. The others (Vector4, Plane, AABB, Projection, Vector4i) go as the
+# raw Variant: VFloats{12, [x, y, z, w]} is a Vector4. A Basis is its three
+# axes, as in GDScript; Godot lays it out by rows, so it is transposed on
+# the way.
+type Vec2i is Data:
+  Vec2i{x: U32, y: U32}
+
+type Vec3i is Data:
+  Vec3i{x: U32, y: U32, z: U32}
+
+type Rect2 is Data:
+  Rect2{position: Vec2, size: Vec2}
+
+type Rect2i is Data:
+  Rect2i{position: Vec2i, size: Vec2i}
+
+type Transform2D is Data:
+  Transform2D{x: Vec2, y: Vec2, origin: Vec2}
+
+type Quaternion is Data:
+  Quaternion{x: F32, y: F32, z: F32, w: F32}
+
+type Basis is Data:
+  Basis{x: Vec3, y: Vec3, z: Vec3}
+
+type Transform3D is Data:
+  Transform3D{basis: Basis, origin: Vec3}
+
+type Rid is Data:
+  Rid{hi: U32, lo: U32}
+
+def vec2i(p: Vec2i) -> Variant:
+  Vec2i{x, y} = p
+  VInts{6, [x, y]}
+
+def vec3i(p: Vec3i) -> Variant:
+  Vec3i{x, y, z} = p
+  VInts{10, [x, y, z]}
+
+def rect2(r: Rect2) -> Variant:
+  Rect2{Vec2{a, b}, Vec2{c, d}} = r
+  VFloats{7, [a, b, c, d]}
+
+def rect2i(r: Rect2i) -> Variant:
+  Rect2i{Vec2i{a, b}, Vec2i{c, d}} = r
+  VInts{8, [a, b, c, d]}
+
+def transform2d(t: Transform2D) -> Variant:
+  Transform2D{Vec2{a, b}, Vec2{c, d}, Vec2{e, f}} = t
+  VFloats{11, [a, b, c, d, e, f]}
+
+def quaternion(q: Quaternion) -> Variant:
+  Quaternion{x, y, z, w} = q
+  VFloats{15, [x, y, z, w]}
+
+def basis(m: Basis) -> Variant:
+  Basis{Vec3{xx, xy, xz}, Vec3{yx, yy, yz}, Vec3{zx, zy, zz}} = m
+  VFloats{17, [xx, yx, zx, xy, yy, zy, xz, yz, zz]}
+
+def transform3d(t: Transform3D) -> Variant:
+  Transform3D{Basis{Vec3{xx, xy, xz}, Vec3{yx, yy, yz}, Vec3{zx, zy, zz}}, Vec3{ox, oy, oz}} = t
+  VFloats{18, [xx, yx, zx, xy, yy, zy, xz, yz, zz, ox, oy, oz]}
+
+def rid(r: Rid) -> Variant:
+  Rid{hi, lo} = r
+  VRid{hi, lo}
+
+def to_vec2i(v: Variant) -> Vec2i:
+  match v:
+    case VInts{kind, x <> y <> rest}:
+      Vec2i{x, y}
+    case other:
+      Vec2i{0, 0}
+
+def to_vec3i(v: Variant) -> Vec3i:
+  match v:
+    case VInts{kind, x <> y <> z <> rest}:
+      Vec3i{x, y, z}
+    case other:
+      Vec3i{0, 0, 0}
+
+def to_rect2(v: Variant) -> Rect2:
+  match v:
+    case VFloats{kind, a <> b <> c <> d <> rest}:
+      Rect2{Vec2{a, b}, Vec2{c, d}}
+    case other:
+      Rect2{Vec2{0.0, 0.0}, Vec2{0.0, 0.0}}
+
+def to_rect2i(v: Variant) -> Rect2i:
+  match v:
+    case VInts{kind, a <> b <> c <> d <> rest}:
+      Rect2i{Vec2i{a, b}, Vec2i{c, d}}
+    case other:
+      Rect2i{Vec2i{0, 0}, Vec2i{0, 0}}
+
+# The identity, when the Variant is no transform.
+def to_transform2d(v: Variant) -> Transform2D:
+  match v:
+    case VFloats{kind, a <> b <> c <> d <> e <> f <> rest}:
+      Transform2D{Vec2{a, b}, Vec2{c, d}, Vec2{e, f}}
+    case other:
+      Transform2D{Vec2{1.0, 0.0}, Vec2{0.0, 1.0}, Vec2{0.0, 0.0}}
+
+def to_quaternion(v: Variant) -> Quaternion:
+  match v:
+    case VFloats{kind, x <> y <> z <> w <> rest}:
+      Quaternion{x, y, z, w}
+    case other:
+      Quaternion{0.0, 0.0, 0.0, 1.0}
+
+def to_basis(v: Variant) -> Basis:
+  match v:
+    case VFloats{kind, xx <> yx <> zx <> xy <> yy <> zy <> xz <> yz <> zz <> rest}:
+      Basis{Vec3{xx, xy, xz}, Vec3{yx, yy, yz}, Vec3{zx, zy, zz}}
+    case other:
+      Basis{Vec3{1.0, 0.0, 0.0}, Vec3{0.0, 1.0, 0.0}, Vec3{0.0, 0.0, 1.0}}
+
+def to_transform3d(v: Variant) -> Transform3D:
+  match v:
+    case VFloats{kind, xx <> yx <> zx <> xy <> yy <> zy <> xz <> yz <> zz <> ox <> oy <> oz <> rest}:
+      Transform3D{Basis{Vec3{xx, xy, xz}, Vec3{yx, yy, yz}, Vec3{zx, zy, zz}}, Vec3{ox, oy, oz}}
+    case other:
+      Transform3D{Basis{Vec3{1.0, 0.0, 0.0}, Vec3{0.0, 1.0, 0.0}, Vec3{0.0, 0.0, 1.0}}, Vec3{0.0, 0.0, 0.0}}
+
+def to_rid(v: Variant) -> Rid:
+  match v:
+    case VRid{hi, lo}:
+      Rid{hi, lo}
+    case other:
+      Rid{0, 0}

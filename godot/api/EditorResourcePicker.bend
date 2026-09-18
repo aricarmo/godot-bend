@@ -18,8 +18,8 @@ def set_base_type(self: Godot.Object, base_type: String) -> IO(Unit):
 def get_base_type(self: Godot.Object) -> IO(String):
   Godot.call_str(self, "get_base_type", [])
 
-def get_allowed_types(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_allowed_types", [])
+def get_allowed_types(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_allowed_types", [])
 
 def set_edited_resource(self: Godot.Object, resource: Godot.Object) -> IO(Unit):
   Godot.run(self, "set_edited_resource", [Godot.VObj{resource}])

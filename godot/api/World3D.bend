@@ -12,14 +12,20 @@ import ../Godot.bend as Godot
 def new() -> IO(Godot.Object):
   Godot.new("World3D")
 
-def get_space(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_space", [])
+def get_space(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_space", [])
+    return Godot.to_rid(v)
 
-def get_navigation_map(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_navigation_map", [])
+def get_navigation_map(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_navigation_map", [])
+    return Godot.to_rid(v)
 
-def get_scenario(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_scenario", [])
+def get_scenario(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_scenario", [])
+    return Godot.to_rid(v)
 
 def set_environment(self: Godot.Object, env: Godot.Object) -> IO(Unit):
   Godot.run(self, "set_environment", [Godot.VObj{env}])

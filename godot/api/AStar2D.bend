@@ -47,11 +47,13 @@ def remove_point(self: Godot.Object, id: U32) -> IO(Unit):
 def has_point(self: Godot.Object, id: U32) -> IO(Bool):
   Godot.call_bool(self, "has_point", [Godot.VInt{id}])
 
-def get_point_connections(self: Godot.Object, id: U32) -> IO(Godot.Variant):
-  Godot.call(self, "get_point_connections", [Godot.VInt{id}])
+def get_point_connections(
+  self: Godot.Object, id: U32
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_point_connections", [Godot.VInt{id}])
 
-def get_point_ids(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_point_ids", [])
+def get_point_ids(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_point_ids", [])
 
 def set_neighbor_filter_enabled(self: Godot.Object, enabled: Bool) -> IO(Unit):
   Godot.run(self, "set_neighbor_filter_enabled", [Godot.VBool{enabled}])
@@ -127,22 +129,23 @@ def get_closest_position_in_segment(
 
 def get_point_path(
   self: Godot.Object, from_id: U32, to_id: U32
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_point_path", [Godot.VInt{from_id}, Godot.VInt{to_id}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_point_path", [
+    Godot.VInt{from_id}, Godot.VInt{to_id}])
 
 def get_point_path.all(
   self: Godot.Object, from_id: U32, to_id: U32, allow_partial_path: Bool
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_point_path", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_point_path", [
     Godot.VInt{from_id}, Godot.VInt{to_id}, Godot.VBool{allow_partial_path}])
 
 def get_id_path(
   self: Godot.Object, from_id: U32, to_id: U32
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_id_path", [Godot.VInt{from_id}, Godot.VInt{to_id}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_id_path", [Godot.VInt{from_id}, Godot.VInt{to_id}])
 
 def get_id_path.all(
   self: Godot.Object, from_id: U32, to_id: U32, allow_partial_path: Bool
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_id_path", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_id_path", [
     Godot.VInt{from_id}, Godot.VInt{to_id}, Godot.VBool{allow_partial_path}])

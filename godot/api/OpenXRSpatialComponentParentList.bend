@@ -12,5 +12,7 @@ import ../Godot.bend as Godot
 def new() -> IO(Godot.Object):
   Godot.new("OpenXRSpatialComponentParentList")
 
-def get_parent(self: Godot.Object, index: U32) -> IO(Godot.Variant):
-  Godot.call(self, "get_parent", [Godot.VInt{index}])
+def get_parent(self: Godot.Object, index: U32) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_parent", [Godot.VInt{index}])
+    return Godot.to_rid(v)

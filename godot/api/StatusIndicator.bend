@@ -36,5 +36,7 @@ def set_menu(self: Godot.Object, menu: String) -> IO(Unit):
 def get_menu(self: Godot.Object) -> IO(String):
   Godot.call_str(self, "get_menu", [])
 
-def get_rect(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_rect", [])
+def get_rect(self: Godot.Object) -> IO(Godot.Rect2):
+  do IO<Godot.Rect2>:
+    v : Godot.Variant <- Godot.call(self, "get_rect", [])
+    return Godot.to_rect2(v)

@@ -32,7 +32,7 @@ def shows(vs: List<&2, Godot.Variant>) -> String:
       " [" ++ shows(items) ++ " ]" ++ shows(rest)
     case Godot.VObj{v} <> rest:
       " obj" ++ shows(rest)
-    case Godot.VOther{} <> rest:
+    case other <> rest:
       " other" ++ shows(rest)
 
 def show(v: Godot.Variant) -> String:

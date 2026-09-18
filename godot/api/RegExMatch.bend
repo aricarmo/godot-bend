@@ -21,8 +21,8 @@ def get_group_count(self: Godot.Object) -> IO(U32):
 def get_names(self: Godot.Object) -> IO(Godot.Variant):
   Godot.call(self, "get_names", [])
 
-def get_strings(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_strings", [])
+def get_strings(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_strings", [])
 
 def get_string(self: Godot.Object) -> IO(String):
   Godot.call_str(self, "get_string", [])

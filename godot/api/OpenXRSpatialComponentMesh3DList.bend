@@ -12,8 +12,10 @@ import ../Godot.bend as Godot
 def new() -> IO(Godot.Object):
   Godot.new("OpenXRSpatialComponentMesh3DList")
 
-def get_transform(self: Godot.Object, index: U32) -> IO(Godot.Variant):
-  Godot.call(self, "get_transform", [Godot.VInt{index}])
+def get_transform(self: Godot.Object, index: U32) -> IO(Godot.Transform3D):
+  do IO<Godot.Transform3D>:
+    v : Godot.Variant <- Godot.call(self, "get_transform", [Godot.VInt{index}])
+    return Godot.to_transform3d(v)
 
 def get_mesh(self: Godot.Object, index: U32) -> IO(Godot.Object):
   Godot.call_obj(self, "get_mesh", [Godot.VInt{index}])

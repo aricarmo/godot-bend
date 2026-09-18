@@ -76,5 +76,5 @@ def get_pattern(self: Godot.Object) -> IO(String):
 def get_group_count(self: Godot.Object) -> IO(U32):
   Godot.call_int(self, "get_group_count", [])
 
-def get_names(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_names", [])
+def get_names(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_names", [])

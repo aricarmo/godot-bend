@@ -9,8 +9,10 @@
 import Base
 import ../Godot.bend as Godot
 
-def get_skeleton(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_skeleton", [])
+def get_skeleton(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_skeleton", [])
+    return Godot.to_rid(v)
 
 def get_skin(self: Godot.Object) -> IO(Godot.Object):
   Godot.call_obj(self, "get_skin", [])

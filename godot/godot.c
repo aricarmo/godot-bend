@@ -29,6 +29,9 @@ static GDExtensionInterfaceVariantNewCopy               gd_var_copy;
 static GDExtensionInterfaceVariantDestroy               gd_var_free;
 static GDExtensionInterfaceVariantCall                  gd_var_call;
 static GDExtensionInterfaceVariantConstruct             gd_var_make;
+static GDExtensionInterfaceVariantSet                   gd_var_set;
+static GDExtensionInterfaceGetVariantFromTypeConstructor gd_from_of;
+static GDExtensionInterfaceGetVariantToTypeConstructor  gd_into_of;
 static GDExtensionInterfaceVariantGetType               gd_var_type;
 static GDExtensionInterfaceVariantStringify             gd_var_text;
 static GDExtensionInterfaceClassdbConstructObject2      gd_construct;
@@ -589,6 +592,72 @@ Term gd_array_open_run(Env e, Term* f, IoWork* w) {
   return (Term)(u32)n;
 }
 
+// gd.packed_new folds the top n values into a packed array of the type,
+// through the Array it can be built from.
+Term gd_packed_new_run(Env e, Term* f, IoWork* w) {
+  Term  count[1] = { f[1] };
+  gd_array_new_run(e, count, w);
+  GdVar arr = *gd_top();
+  GdVar out;
+  GDExtensionCallError err = { 0 };
+  GDExtensionConstVariantPtr args[1] = { &arr };
+  gd_var_make((GDExtensionVariantType)(u32)f[0], &out, args, 1, &err);
+  if (err.error != GDEXTENSION_CALL_OK) {
+    gd_error("no packed array of that type from those items", "");
+    gd_var_nil(&out);
+  }
+  gd_var_free(&arr);
+  *gd_push() = out;
+  return GD_UNIT;
+}
+
+// gd.dict_new folds the top n values, key then value and so on, into a
+// Dictionary; gd.dict_open spreads one out the same way and answers n.
+Term gd_dict_new_run(Env e, Term* f, IoWork* w) {
+  u32 n = (u32)f[0] & ~1u;
+  if (n > gd_sp) {
+    err_fail("godot: a dictionary of more items than the stack holds");
+  }
+  GdVar  dict;
+  GdVar* items = gd_stack + (gd_sp - n);
+  GDExtensionCallError err = { 0 };
+  gd_var_make(GDEXTENSION_VARIANT_TYPE_DICTIONARY, &dict, NULL, 0, &err);
+  for (u32 i = 0; i < n; i += 2) {
+    GDExtensionBool valid = 0;
+    gd_var_set(&dict, &items[i], &items[i + 1], &valid);
+    gd_var_free(&items[i]);
+    gd_var_free(&items[i + 1]);
+  }
+  gd_sp -= n;
+  *gd_push() = dict;
+  return GD_UNIT;
+}
+
+Term gd_dict_open_run(Env e, Term* f, IoWork* w) {
+  GdVar   dict = *gd_top();
+  GdVar   keys;
+  GdVar   ret;
+  int64_t n = 0;
+  gd_method(&dict, "keys", NULL, &keys);
+  gd_method(&keys, "size", NULL, &ret);
+  gd_into[GD_INT](&n, &ret);
+  gd_var_free(&ret);
+  for (int64_t i = 0; i < n; i += 1) {
+    GdVar at;
+    GdVar key;
+    GdVar value;
+    gd_from[GD_INT](&at, &i);
+    gd_method(&keys, "get", &at, &key);
+    gd_method(&dict, "get", &key, &value);
+    gd_var_free(&at);
+    *gd_push() = key;
+    *gd_push() = value;
+  }
+  gd_var_free(&keys);
+  gd_var_free(&dict);
+  return (Term)(u32)(2 * n);
+}
+
 Term gd_push_obj_run(Env e, Term* f, IoWork* w) {
   GdVar* v = gd_slot_var((u32)f[0]);
   if (v == NULL) {
@@ -748,6 +817,134 @@ Term gd_util_run(Env e, Term* f, IoWork* w) {
   return GD_UNIT;
 }
 
+// Structs
+// -------
+
+// Godot's numeric structs are flat runs of f32 or int32 (in the official,
+// single-precision build), so one pair of effects carries them all: pack
+// folds the top numbers into a value of a type, unpack spreads one out.
+// The numbers go in memory order: a Rect2 is position then size, a
+// Transform2D its x, y and origin columns, a Transform3D a Basis then the
+// origin, and a Basis its three rows.
+static int gd_struct_len(u32 type, bool* ints) {
+  *ints = false;
+  switch (type) {
+    case GDEXTENSION_VARIANT_TYPE_VECTOR2I:    *ints = true; return 2;
+    case GDEXTENSION_VARIANT_TYPE_RECT2:       return 4;
+    case GDEXTENSION_VARIANT_TYPE_RECT2I:      *ints = true; return 4;
+    case GDEXTENSION_VARIANT_TYPE_VECTOR3I:    *ints = true; return 3;
+    case GDEXTENSION_VARIANT_TYPE_TRANSFORM2D: return 6;
+    case GDEXTENSION_VARIANT_TYPE_VECTOR4:     return 4;
+    case GDEXTENSION_VARIANT_TYPE_VECTOR4I:    *ints = true; return 4;
+    case GDEXTENSION_VARIANT_TYPE_PLANE:       return 4;
+    case GDEXTENSION_VARIANT_TYPE_QUATERNION:  return 4;
+    case GDEXTENSION_VARIANT_TYPE_AABB:        return 6;
+    case GDEXTENSION_VARIANT_TYPE_BASIS:       return 9;
+    case GDEXTENSION_VARIANT_TYPE_TRANSFORM3D: return 12;
+    case GDEXTENSION_VARIANT_TYPE_PROJECTION:  return 16;
+    default:                                   return 0;
+  }
+}
+
+typedef union { f32 f[16]; int32_t i[16]; } GdNums;
+
+// gd.pack(type, n) folds the top n numbers into one value of the type.
+Term gd_pack_run(Env e, Term* f, IoWork* w) {
+  bool ints = false;
+  u32  type = (u32)f[0];
+  u32  n    = (u32)f[1];
+  int  len  = gd_struct_len(type, &ints);
+  if (n > gd_sp) {
+    err_fail("godot: a pack of more numbers than the stack holds");
+  }
+  GdVar* nums = gd_stack + (gd_sp - n);
+  GdNums raw  = { { 0 } };
+  for (u32 k = 0; k < n; k += 1) {
+    if ((int)k < len) {
+      double  x = 0;
+      int64_t i = 0;
+      if (gd_var_type(&nums[k]) == GDEXTENSION_VARIANT_TYPE_INT) {
+        gd_into[GD_INT](&i, &nums[k]);
+        x = (double)i;
+      } else {
+        gd_into[GD_FLOAT](&x, &nums[k]);
+        i = (int64_t)x;
+      }
+      if (ints) {
+        raw.i[k] = (int32_t)i;
+      } else {
+        raw.f[k] = (f32)x;
+      }
+    }
+    gd_var_free(&nums[k]);
+  }
+  gd_sp -= n;
+  if (len == 0) {
+    gd_error("a pack of a type that is no numeric struct", "");
+    gd_var_nil(gd_push());
+  } else {
+    gd_from_of((GDExtensionVariantType)type)(gd_push(), &raw);
+  }
+  return GD_UNIT;
+}
+
+// gd.unpack pops a struct, pushes its numbers in order, then how many,
+// and answers the struct's type.
+Term gd_unpack_run(Env e, Term* f, IoWork* w) {
+  GdVar   v    = *gd_top();
+  u32     type = (u32)gd_var_type(&v);
+  bool    ints = false;
+  int64_t len  = gd_struct_len(type, &ints);
+  GdNums  raw  = { { 0 } };
+  if (len != 0) {
+    gd_into_of((GDExtensionVariantType)type)(&raw, &v);
+  }
+  gd_var_free(&v);
+  for (int k = 0; k < len; k += 1) {
+    if (ints) {
+      int64_t i = raw.i[k];
+      gd_from[GD_INT](gd_push(), &i);
+    } else {
+      double x = raw.f[k];
+      gd_from[GD_FLOAT](gd_push(), &x);
+    }
+  }
+  gd_from[GD_INT](gd_push(), &len);
+  return (Term)type;
+}
+
+// A RID is a 64-bit id, which Bend holds as two halves.
+Term gd_push_rid_run(Env e, Term* f, IoWork* w) {
+  u64 id = ((u64)(u32)f[0] << 32) | (u32)f[1];
+  gd_from_of(GDEXTENSION_VARIANT_TYPE_RID)(gd_push(), &id);
+  return GD_UNIT;
+}
+
+Term gd_pop_rid_run(Env e, Term* f, IoWork* w) {
+  GdVar* v  = gd_top();
+  u64    id = 0;
+  gd_into_of(GDEXTENSION_VARIANT_TYPE_RID)(&id, v);
+  gd_var_free(v);
+  return io_tup(e, (Term)(u32)(id >> 32), (Term)(u32)id);
+}
+
+// gd.push_callable makes a Callable that queues a signal under the tag,
+// the one gd.connect gives a signal: a callback handed to the engine (a
+// tween's, a timer's) arrives in Godot.signals().
+Term gd_push_callable_run(Env e, Term* f, IoWork* w) {
+  GDExtensionCallableCustomInfo2 info = {
+    .callable_userdata = (void*)(uintptr_t)(u32)f[0],
+    .token             = gd_lib,
+    .object_id         = gd_obj_id(gd_self),
+    .call_func         = gd_signal_call,
+  };
+  GdCall call;
+  gd_callable(&call, &info);
+  gd_from[GD_CALL](gd_push(), &call);
+  gd_call_free(&call);
+  return GD_UNIT;
+}
+
 // gd.kind, by Godot.bend's numbering; a null object counts as Nil, and a
 // StringName or a NodePath as the String it pops as.
 Term gd_kind_run(Env e, Term* f, IoWork* w) {
@@ -768,7 +965,18 @@ Term gd_kind_run(Env e, Term* f, IoWork* w) {
     case GDEXTENSION_VARIANT_TYPE_VECTOR3:     return 7;
     case GDEXTENSION_VARIANT_TYPE_COLOR:       return 8;
     case GDEXTENSION_VARIANT_TYPE_ARRAY:       return 9;
-    default:                                   return 10;
+    case GDEXTENSION_VARIANT_TYPE_RID:         return 13;
+    case GDEXTENSION_VARIANT_TYPE_DICTIONARY:  return 14;
+    default: {
+      // A packed array opens as an Array does; a numeric struct unpacks.
+      bool ints = false;
+      u32  type = (u32)gd_var_type(v);
+      if (type >= GDEXTENSION_VARIANT_TYPE_PACKED_BYTE_ARRAY
+        && type <= GDEXTENSION_VARIANT_TYPE_PACKED_VECTOR4_ARRAY) {
+        return 9;
+      }
+      return gd_struct_len(type, &ints) == 0 ? 10 : ints ? 12 : 11;
+    }
   }
 }
 
@@ -1015,6 +1223,30 @@ static void __attribute__((constructor)) gd_use(void) {
 #ifdef CID_GD_LISTEN
   io_eff(CID_GD_LISTEN, gd_listen_run, 0);
 #endif
+#ifdef CID_GD_PACK
+  io_eff(CID_GD_PACK, gd_pack_run, 0);
+#endif
+#ifdef CID_GD_UNPACK
+  io_eff(CID_GD_UNPACK, gd_unpack_run, 0);
+#endif
+#ifdef CID_GD_PUSH_RID
+  io_eff(CID_GD_PUSH_RID, gd_push_rid_run, 0);
+#endif
+#ifdef CID_GD_POP_RID
+  io_eff(CID_GD_POP_RID, gd_pop_rid_run, 0);
+#endif
+#ifdef CID_GD_PUSH_CALLABLE
+  io_eff(CID_GD_PUSH_CALLABLE, gd_push_callable_run, 0);
+#endif
+#ifdef CID_GD_PACKED_NEW
+  io_eff(CID_GD_PACKED_NEW, gd_packed_new_run, 0);
+#endif
+#ifdef CID_GD_DICT_NEW
+  io_eff(CID_GD_DICT_NEW, gd_dict_new_run, 0);
+#endif
+#ifdef CID_GD_DICT_OPEN
+  io_eff(CID_GD_DICT_OPEN, gd_dict_open_run, 0);
+#endif
 #ifdef CID_GD_STATIC
   io_eff(CID_GD_STATIC, gd_static_run, 0);
 #endif
@@ -1229,6 +1461,8 @@ GDExtensionBool godot_bend_init(GDExtensionInterfaceGetProcAddress get,
     get("variant_destroy");
   gd_var_call     = (GDExtensionInterfaceVariantCall)
     get("variant_call");
+  gd_var_set      = (GDExtensionInterfaceVariantSet)
+    get("variant_set");
   gd_var_make     = (GDExtensionInterfaceVariantConstruct)
     get("variant_construct");
   gd_var_type     = (GDExtensionInterfaceVariantGetType)
@@ -1259,6 +1493,8 @@ GDExtensionBool godot_bend_init(GDExtensionInterfaceGetProcAddress get,
   GDExtensionInterfaceGetVariantToTypeConstructor into =
     (GDExtensionInterfaceGetVariantToTypeConstructor)
     get("get_variant_to_type_constructor");
+  gd_from_of = from;
+  gd_into_of = into;
   for (int k = 0; k < GD_KINDS; k += 1) {
     gd_from[k] = from(gd_types[k]);
     gd_into[k] = into(gd_types[k]);

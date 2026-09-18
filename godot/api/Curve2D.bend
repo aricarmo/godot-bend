@@ -82,17 +82,20 @@ def sample_baked.all(
   Godot.call_vec2(self, "sample_baked", [
     Godot.VFloat{offset}, Godot.VBool{cubic}])
 
-def sample_baked_with_rotation(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "sample_baked_with_rotation", [])
+def sample_baked_with_rotation(self: Godot.Object) -> IO(Godot.Transform2D):
+  do IO<Godot.Transform2D>:
+    v : Godot.Variant <- Godot.call(self, "sample_baked_with_rotation", [])
+    return Godot.to_transform2d(v)
 
 def sample_baked_with_rotation.all(
   self: Godot.Object, offset: F32, cubic: Bool
-) -> IO(Godot.Variant):
-  Godot.call(self, "sample_baked_with_rotation", [
-    Godot.VFloat{offset}, Godot.VBool{cubic}])
+) -> IO(Godot.Transform2D):
+  do IO<Godot.Transform2D>:
+    v : Godot.Variant <- Godot.call(self, "sample_baked_with_rotation", [Godot.VFloat{offset}, Godot.VBool{cubic}])
+    return Godot.to_transform2d(v)
 
-def get_baked_points(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_baked_points", [])
+def get_baked_points(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_baked_points", [])
 
 def get_closest_point(
   self: Godot.Object, to_point: Godot.Vec2
@@ -102,20 +105,20 @@ def get_closest_point(
 def get_closest_offset(self: Godot.Object, to_point: Godot.Vec2) -> IO(F32):
   Godot.call_float(self, "get_closest_offset", [Godot.vec2(to_point)])
 
-def tessellate(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "tessellate", [])
+def tessellate(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "tessellate", [])
 
 def tessellate.all(
   self: Godot.Object, max_stages: U32, tolerance_degrees: F32
-) -> IO(Godot.Variant):
-  Godot.call(self, "tessellate", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "tessellate", [
     Godot.VInt{max_stages}, Godot.VFloat{tolerance_degrees}])
 
-def tessellate_even_length(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "tessellate_even_length", [])
+def tessellate_even_length(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "tessellate_even_length", [])
 
 def tessellate_even_length.all(
   self: Godot.Object, max_stages: U32, tolerance_length: F32
-) -> IO(Godot.Variant):
-  Godot.call(self, "tessellate_even_length", [
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "tessellate_even_length", [
     Godot.VInt{max_stages}, Godot.VFloat{tolerance_length}])

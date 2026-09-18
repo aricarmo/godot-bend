@@ -38,8 +38,8 @@ def intersect_shape.all(
 
 def cast_motion(
   self: Godot.Object, parameters: Godot.Object
-) -> IO(Godot.Variant):
-  Godot.call(self, "cast_motion", [Godot.VObj{parameters}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "cast_motion", [Godot.VObj{parameters}])
 
 def collide_shape(
   self: Godot.Object, parameters: Godot.Object

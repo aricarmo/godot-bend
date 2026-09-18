@@ -39,20 +39,20 @@ def standardize_locale.all(
   Godot.call_str(self, "standardize_locale", [
     Godot.VStr{locale}, Godot.VBool{add_defaults}])
 
-def get_all_languages(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_all_languages", [])
+def get_all_languages(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_all_languages", [])
 
 def get_language_name(self: Godot.Object, language: String) -> IO(String):
   Godot.call_str(self, "get_language_name", [Godot.VStr{language}])
 
-def get_all_scripts(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_all_scripts", [])
+def get_all_scripts(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_all_scripts", [])
 
 def get_script_name(self: Godot.Object, script: String) -> IO(String):
   Godot.call_str(self, "get_script_name", [Godot.VStr{script}])
 
-def get_all_countries(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_all_countries", [])
+def get_all_countries(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_all_countries", [])
 
 def get_country_name(self: Godot.Object, country: String) -> IO(String):
   Godot.call_str(self, "get_country_name", [Godot.VStr{country}])
@@ -128,8 +128,8 @@ def remove_domain(self: Godot.Object, domain: String) -> IO(Unit):
 def clear(self: Godot.Object) -> IO(Unit):
   Godot.run(self, "clear", [])
 
-def get_loaded_locales(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_loaded_locales", [])
+def get_loaded_locales(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_loaded_locales", [])
 
 def format_number(
   self: Godot.Object, number: String, locale: String

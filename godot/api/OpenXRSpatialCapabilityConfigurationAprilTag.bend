@@ -24,8 +24,8 @@ def APRIL_TAG_DICT_36H10() -> U32:
 def APRIL_TAG_DICT_36H11() -> U32:
   4
 
-def get_enabled_components(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_enabled_components", [])
+def get_enabled_components(self: Godot.Object) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_enabled_components", [])
 
 def set_april_dict(self: Godot.Object, april_dict: U32) -> IO(Unit):
   Godot.run(self, "set_april_dict", [Godot.VInt{april_dict}])

@@ -53,8 +53,8 @@ def set_uid(self: Godot.Object, resource: String, uid: U32) -> IO(U32):
 
 def get_recognized_extensions(
   self: Godot.Object, type_: Godot.Object
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_recognized_extensions", [Godot.VObj{type_}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_recognized_extensions", [Godot.VObj{type_}])
 
 def add_resource_format_saver(
   self: Godot.Object, format_saver: Godot.Object

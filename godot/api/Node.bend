@@ -518,8 +518,10 @@ def get_process_thread_group_order(self: Godot.Object) -> IO(U32):
 def queue_accessibility_update(self: Godot.Object) -> IO(Unit):
   Godot.run(self, "queue_accessibility_update", [])
 
-def get_accessibility_element(self: Godot.Object) -> IO(Godot.Variant):
-  Godot.call(self, "get_accessibility_element", [])
+def get_accessibility_element(self: Godot.Object) -> IO(Godot.Rid):
+  do IO<Godot.Rid>:
+    v : Godot.Variant <- Godot.call(self, "get_accessibility_element", [])
+    return Godot.to_rid(v)
 
 def set_display_folded(self: Godot.Object, fold: Bool) -> IO(Unit):
   Godot.run(self, "set_display_folded", [Godot.VBool{fold}])

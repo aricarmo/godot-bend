@@ -76,8 +76,9 @@ def load.all(
 
 def get_recognized_extensions_for_type(
   self: Godot.Object, type_: String
-) -> IO(Godot.Variant):
-  Godot.call(self, "get_recognized_extensions_for_type", [Godot.VStr{type_}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_recognized_extensions_for_type", [
+    Godot.VStr{type_}])
 
 def add_resource_format_loader(
   self: Godot.Object, format_loader: Godot.Object
@@ -98,8 +99,10 @@ def remove_resource_format_loader(
 def set_abort_on_missing_resources(self: Godot.Object, abort: Bool) -> IO(Unit):
   Godot.run(self, "set_abort_on_missing_resources", [Godot.VBool{abort}])
 
-def get_dependencies(self: Godot.Object, path: String) -> IO(Godot.Variant):
-  Godot.call(self, "get_dependencies", [Godot.VStr{path}])
+def get_dependencies(
+  self: Godot.Object, path: String
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "get_dependencies", [Godot.VStr{path}])
 
 def has_cached(self: Godot.Object, path: String) -> IO(Bool):
   Godot.call_bool(self, "has_cached", [Godot.VStr{path}])
@@ -118,5 +121,5 @@ def get_resource_uid(self: Godot.Object, path: String) -> IO(U32):
 
 def list_directory(
   self: Godot.Object, directory_path: String
-) -> IO(Godot.Variant):
-  Godot.call(self, "list_directory", [Godot.VStr{directory_path}])
+) -> IO(List<&2, Godot.Variant>):
+  Godot.call_list(self, "list_directory", [Godot.VStr{directory_path}])
