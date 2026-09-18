@@ -11,6 +11,9 @@
 # follow the ones `bend file.bend -o file` passes (bend2/main.ts), plus
 # -shared, and main is renamed since the library has no use for the CLI.
 #
+# A scene with several Bend programs needs a library each, and each its own
+# node class: BEND_CLASS=Enemy names it (the default is BendRuntime).
+#
 # The android target cross-compiles for arm64 with the NDK's clang, found
 # through ANDROID_NDK_HOME or as the newest NDK of the Android SDK. Bionic
 # keeps pthreads inside libc, so that one links without -lpthread.
@@ -28,6 +31,7 @@ TARGET=${3:-host}
 [ -n "$SRC" ] && [ -n "$OUT" ] || { echo "usage: $0 main.bend out [android|ios]" >&2; exit 1; }
 mkdir -p "$(dirname "$OUT")"
 C="${OUT%.*}.c"
+CLASS="-DGD_CLASS=\"${BEND_CLASS:-BendRuntime}\""
 LIBS="-lpthread -lm"
 CC=${CC:-clang}
 if [ "$TARGET" = android ]; then
@@ -44,7 +48,8 @@ if [ "$TARGET" = ios ]; then
   slice() { # name, sdk, clang target
     mkdir -p "$TMP/$1"
     xcrun --sdk "$2" clang -target "$3" -std=c11 -O3 -fvisibility=hidden \
-      -Dmain=bend_cli_main -I "$ROOT/godot" -c "$C" -o "$TMP/$1/libgame.o"
+      -Dmain=bend_cli_main "$CLASS" -I "$ROOT/godot" -c "$C" \
+      -o "$TMP/$1/libgame.o"
     xcrun ar rcs "$TMP/$1/libgame.a" "$TMP/$1/libgame.o"
   }
   slice device iphoneos arm64-apple-ios14.0
@@ -60,5 +65,5 @@ if [ "$TARGET" = ios ]; then
   exit 0
 fi
 "$CC" -std=c11 -O3 -shared -fPIC -fvisibility=hidden -Dmain=bend_cli_main \
-  -I "$ROOT/godot" "$C" $LIBS -o "$OUT"
+  "$CLASS" -I "$ROOT/godot" "$C" $LIBS -o "$OUT"
 echo "built $OUT"

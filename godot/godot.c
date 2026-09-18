@@ -1322,6 +1322,14 @@ static void gd_input(GDExtensionObjectPtr event) {
 // BendRuntime
 // -----------
 
+// A library is one program, since the Bend runtime keeps its state in
+// globals, so a scene with several programs loads several libraries, and
+// each must register its node under its own name: build with
+// -DGD_CLASS='"Enemy"' (tools/build.sh reads BEND_CLASS).
+#ifndef GD_CLASS
+#define GD_CLASS "BendRuntime"
+#endif
+
 // The node that hosts the program: _ready boots Bend and runs main up to
 // its first gd.frame, _process resumes it once per frame.
 static GDExtensionObjectPtr gd_rt_create(void* data, GDExtensionBool notify) {
@@ -1369,6 +1377,11 @@ static void gd_rt_call(GDExtensionClassInstancePtr self,
       gd_self = (GDExtensionObjectPtr)self;
       gd_boot();
     }
+    return;
+  }
+  // One node runs the program, the first to be ready. A second node of the
+  // class is inert: it would otherwise answer gd.frame twice a frame.
+  if ((GDExtensionObjectPtr)self != gd_self) {
     return;
   }
   if (which == &gd_n_input) {
@@ -1506,7 +1519,7 @@ GDExtensionBool godot_bend_init(GDExtensionInterfaceGetProcAddress get,
   gd_sn_free  = destructor(GDEXTENSION_VARIANT_TYPE_STRING_NAME);
   gd_call_free = destructor(GDEXTENSION_VARIANT_TYPE_CALLABLE);
   gd_n_node    = gd_name("Node");
-  gd_n_runtime = gd_name("BendRuntime");
+  gd_n_runtime = gd_name(GD_CLASS);
   gd_n_ready   = gd_name("_ready");
   gd_n_process = gd_name("_process");
   gd_n_input   = gd_name("_input");

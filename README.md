@@ -179,6 +179,23 @@ Godot main loop ──_process(delta)──▶ BendRuntime ──resume──▶
                                                    ◀──park─── Godot.frame()
 ```
 
+### Several programs in a scene
+
+A library is one program: the Bend runtime keeps its state in globals. So a
+scene with several programs loads several libraries, each with its own
+`.gdextension` and its own node class, named at build time:
+
+```sh
+BEND_CLASS=Enemy tools/build.sh enemy.bend game/bin/libenemy.dylib
+```
+
+Each has its own runtime, heap and worker threads, and they meet through the
+engine (nodes, metadata, signals, groups), as `tests/two.bend` and
+`tests/two.second.bend` do. Only one node of a class runs the program, the
+first to be ready; another is inert. On iOS, where libraries are linked
+statically into one binary, two programs would collide, so it is one per app
+there.
+
 ## Try it
 
 Needs [Bun](https://bun.sh) (Bend's compiler runs on it), clang 14+ and
@@ -285,7 +302,7 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] Android (arm64)
 - [x] iOS: builds, runs in the simulator
 - [ ] iOS on a device; Windows when Bend supports it
-- [ ] Several Bend programs per scene (today: one `BendRuntime`, one `main`)
+- [x] Several Bend programs per scene, a library and a node class each
 
 ## Known limits
 
