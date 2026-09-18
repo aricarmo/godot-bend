@@ -32,6 +32,8 @@ TARGET=${3:-host}
 mkdir -p "$(dirname "$OUT")"
 C="${OUT%.*}.c"
 CLASS="-DGD_CLASS=\"${BEND_CLASS:-BendRuntime}\""
+# The runtime's fail-stop lands in godot.c instead of ending the process.
+TRAP="-D_exit(c)=gd_exit(c)"
 LIBS="-lpthread -lm"
 CC=${CC:-clang}
 if [ "$TARGET" = android ]; then
@@ -48,7 +50,7 @@ if [ "$TARGET" = ios ]; then
   slice() { # name, sdk, clang target
     mkdir -p "$TMP/$1"
     xcrun --sdk "$2" clang -target "$3" -std=c11 -O3 -fvisibility=hidden \
-      -Dmain=bend_cli_main "$CLASS" -I "$ROOT/godot" -c "$C" \
+      -Dmain=bend_cli_main "$CLASS" "$TRAP" -I "$ROOT/godot" -c "$C" \
       -o "$TMP/$1/libgame.o"
     xcrun ar rcs "$TMP/$1/libgame.a" "$TMP/$1/libgame.o"
   }
@@ -65,5 +67,5 @@ if [ "$TARGET" = ios ]; then
   exit 0
 fi
 "$CC" -std=c11 -O3 -shared -fPIC -fvisibility=hidden -Dmain=bend_cli_main \
-  "$CLASS" -I "$ROOT/godot" "$C" $LIBS -o "$OUT"
+  "$CLASS" "$TRAP" -I "$ROOT/godot" "$C" $LIBS -o "$OUT"
 echo "built $OUT"

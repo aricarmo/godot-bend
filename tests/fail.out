@@ -1,0 +1,5 @@
+second: started
+first: about to fail
+bend: godot: a pop on an empty stack
+ERROR: bend: the runtime stopped the program (its reason is on stderr)
+second: still running

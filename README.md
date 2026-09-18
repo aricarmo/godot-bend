@@ -289,6 +289,8 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] More `Variant` kinds: Vector3, Color, nested arrays, negative ints
 - [x] Dictionaries, RIDs, transforms and the other numeric structs, packed
       arrays, Callables as signal tags
+- [x] A runtime failure ends the program, not the game; crashes reach
+      Godot's crash handler
 - [ ] Ints past 32 bits; virtual methods (overriding `_draw`, `_physics_process`)
 - [x] Signals delivered to the program as a queue; input by polling
 - [x] A game: Pong
@@ -308,11 +310,16 @@ and runs it outside the engine, on the JS twins of the effects
 
 From how the Bend runtime is built today, and from what this binding has not done yet:
 
-- The runtime installs its own `SIGSEGV`/`SIGBUS` handlers, so a crash
-  anywhere in the process, Godot's included, reports as `bend: memory fault`.
 - It reserves up to 8 TiB of virtual address space (halving down to 8 GiB
   when refused). Android takes that; an iPhone is untested.
-- A runtime failure calls `exit`, which takes the editor down with it.
+- When the runtime cannot go on it ends the process. Inside Godot that is
+  turned into the end of the program only: `tools/build.sh` redirects the
+  runtime's `_exit` into the shim, which leaves the pump, logs an error in
+  Godot and lets the game go on (`tests/fail.bend`). From one of the runtime's
+  worker threads there is nowhere to return to, and the process does end.
+- The runtime takes over `SIGSEGV` and `SIGBUS`. The shim puts a handler of
+  its own in front, which hands every fault on to Godot's crash handler, so a
+  crash still comes with Godot's backtrace.
 - Handles are released by hand (`Godot.drop`): nothing collects them.
 - Bend drops the effects a program never reaches, so `godot.c` registers each
   one under `#ifdef`; a new effect needs its line there.

@@ -288,6 +288,72 @@ static GdVar* gd_top(void) {
   return &gd_stack[gd_sp];
 }
 
+// Failing
+// -------
+
+// The runtime ends the process when it cannot go on (err_fail calls
+// _exit), and takes over SIGSEGV and SIGBUS to catch its own stack
+// overflow. Both are right for a binary and wrong inside a game.
+//
+// tools/build.sh compiles with -D'_exit(c)=gd_exit(c)', so every such end
+// lands here instead. On the thread that pumps, it jumps back out of the
+// pump: the program is over, Godot's log says why, and the game goes on
+// without it. From a worker thread there is nowhere to jump to, and the
+// process does end.
+#include <setjmp.h>
+
+extern void (_exit)(int) __attribute__((noreturn));
+
+static jmp_buf   gd_trap;
+static bool      gd_trapping;
+static pthread_t gd_thread;
+
+__attribute__((noreturn)) void gd_exit(int code) {
+  if (gd_trapping && pthread_equal(pthread_self(), gd_thread)) {
+    longjmp(gd_trap, code == 0 ? 256 : code);
+  }
+  (_exit)(code);
+}
+
+// The handlers Godot had, and ours in front of them: it names a fault on
+// the guard page of the evaluator's stack, which is a Bend program
+// recursing too deep, and hands every fault on to Godot's crash handler,
+// backtrace and all.
+static struct sigaction gd_old_segv;
+static struct sigaction gd_old_bus;
+
+static void gd_fault(int sig, siginfo_t* info, void* ctx) {
+  char* at   = (char*)info->si_addr;
+  char* deep = (char*)io_stk + (1ull << 31);
+  if (io_stk != NULL && at >= deep && at < deep + 16384) {
+    static const char text[] =
+      "bend: the program recursed past its 2 GiB stack\n";
+    (void)!write(2, text, sizeof text - 1);
+  }
+  struct sigaction* old = sig == SIGBUS ? &gd_old_bus : &gd_old_segv;
+  if (old->sa_flags & SA_SIGINFO) {
+    old->sa_sigaction(sig, info, ctx);
+  } else if (old->sa_handler != SIG_DFL && old->sa_handler != SIG_IGN) {
+    old->sa_handler(sig);
+  }
+  signal(sig, SIG_DFL);
+}
+
+// The runtime installs its handler again with every worker's stack, so
+// this runs after each pump, and only acts when that happened.
+static void gd_faults(void) {
+  struct sigaction now;
+  sigaction(SIGSEGV, NULL, &now);
+  if ((now.sa_flags & SA_SIGINFO) && now.sa_sigaction == gd_fault) {
+    return;
+  }
+  struct sigaction sa = { 0 };
+  sa.sa_sigaction = gd_fault;
+  sa.sa_flags     = SA_SIGINFO | SA_ONSTACK;
+  sigaction(SIGSEGV, &sa, NULL);
+  sigaction(SIGBUS, &sa, NULL);
+}
+
 // Pump
 // ----
 
@@ -346,7 +412,7 @@ static void gd_poll(Env e) {
 // the parked ones that came due and runs those. The native io_loop blocks
 // when nothing is ready; here that hands the thread back to Godot, and
 // the next frame asks again.
-static void gd_pump(void) {
+static void gd_pump_raw(void) {
   Env e = { CORPUS, ALC[0] };
   for (;;) {
     while (gd_code < 0 && io_runs.head != NULL) {
@@ -363,7 +429,34 @@ static void gd_pump(void) {
   io_sync();
 }
 
-static void gd_boot(void) {
+// Runs a step of the program with gd_exit's way out in place, and says in
+// Godot's log how the program ended, when it did: by its own IO.die, or by
+// the runtime giving up.
+static void gd_guarded(void (*step)(void)) {
+  bool was = gd_code >= 0;
+  gd_thread   = pthread_self();
+  gd_trapping = true;
+  int code = setjmp(gd_trap);
+  if (code == 0) {
+    step();
+  } else {
+    gd_code = code;
+    gd_error("the runtime stopped the program (its reason is on stderr)", "");
+  }
+  gd_trapping = false;
+  if (!was && gd_code > 0 && code == 0) {
+    char text[32];
+    snprintf(text, sizeof text, "%d", gd_code);
+    gd_error("the program ended with code ", text);
+  }
+  gd_faults();
+}
+
+static void gd_pump(void) {
+  gd_guarded(gd_pump_raw);
+}
+
+static void gd_boot_raw(void) {
   Corpus H = corpus_setup(false, cpu_count(), 0);
   Env    e = { H, ALC[0] };
   io_stk = pool_stack();
@@ -374,7 +467,14 @@ static void gd_boot(void) {
   io_spawn(corpus_eval(H, term_tsk(MAIN_FID, task_node(e, MAIN_FID,
     TERM_HOLE, 0, 0))));
   gd_up = true;
-  gd_pump();
+  gd_pump_raw();
+}
+
+static void gd_boot(void) {
+  sigaction(SIGSEGV, NULL, &gd_old_segv);
+  sigaction(SIGBUS, NULL, &gd_old_bus);
+  gd_guarded(gd_boot_raw);
+  gd_up = true;
 }
 
 // Signals
