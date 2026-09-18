@@ -6,13 +6,14 @@
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 GODOT=${GODOT:-godot}
+case $(uname -s) in Darwin) LIB=libgame.dylib;; *) LIB=libgame.so;; esac
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 cp "$ROOT/demo/project.godot" "$ROOT/demo/game.gdextension" \
   "$ROOT/demo/main.tscn" "$WORK"
 fail=0
 for t in "$ROOT"/tests/*.bend; do
-  "$ROOT/tools/build.sh" "$t" "$WORK/bin/libgame.dylib" >/dev/null
+  "$ROOT/tools/build.sh" "$t" "$WORK/bin/$LIB" >/dev/null
   # The first headless import of a project with any GDExtension crashes
   # at shutdown (godotengine/godot#123511), after the import is done.
   sh -c '"$0" --path "$1" --headless --import >/dev/null 2>&1' \

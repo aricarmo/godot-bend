@@ -6,3 +6,5 @@ compatibility_minimum = "4.4"
 [libraries]
 
 macos = "res://bin/libgame.dylib"
+linux.x86_64 = "res://bin/libgame.so"
+linux.arm64 = "res://bin/libgame.so"

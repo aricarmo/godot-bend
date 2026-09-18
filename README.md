@@ -28,7 +28,7 @@ engine. Every Godot class has a generated Bend file of typed methods
 (14,931 of them, every one that is not virtual but three), over a dynamic core that calls any method by name, as
 GDScript's `obj.call(..)` does, and the program hears signals and input.
 There is a [Pong](pong/main.bend) written in it. Tested with Godot 4.6.3 on
-macOS arm64.
+macOS (arm64) and Linux (arm64 and, in CI, x86_64).
 
 ## The typed API
 
@@ -217,6 +217,10 @@ godot --path pong
 Its rules are pure Bend functions over `F32`s; the IO loop reads the keys,
 steps the rules once per frame and moves four Godot nodes.
 
+On Linux the library is a `.so`: `tools/build.sh demo/main.bend
+demo/bin/libgame.so`. `tools/linux.Dockerfile` runs the whole suite in a
+container, which is what CI does.
+
 `GODOT=/path/to/godot tools/test.sh` runs `tests/*.bend` inside the engine
 and compares their output.
 
@@ -235,6 +239,7 @@ and runs it outside the engine, on the JS twins of the effects
 | `godot/godot.js` | JS twins of the effects, for checking and running outside Godot |
 | `godot/gdextension_interface.h` | Godot's C API, dumped from 4.6.3 |
 | `tools/build.sh` | `.bend` → `.c` → shared library |
+| `tools/linux.Dockerfile` | The suite on Linux, in a container |
 | `demo/` | A Godot project that runs `demo/main.bend`: a sprite in orbit |
 | `pong/` | Pong: pure rules, a Godot scene built from Bend, keyboard input |
 | `tests/` | Programs run inside a headless Godot by `tools/test.sh` |
@@ -258,7 +263,8 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] Static methods, utility functions (`lerp`, `randf`, ..) and global enums (`KEY_W`)
 - [x] A non-blocking poll in the pump, so `IO.sleep`, sockets and channels
       work inside Godot
-- [ ] Linux, then Android and iOS; Windows when Bend supports it
+- [x] Linux
+- [ ] Android and iOS; Windows when Bend supports it
 - [ ] Several Bend programs per scene (today: one `BendRuntime`, one `main`)
 
 ## Known limits

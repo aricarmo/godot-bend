@@ -1,7 +1,8 @@
 #!/bin/sh
 # Builds a Bend program into a GDExtension library.
 #
-#   tools/build.sh demo/main.bend demo/bin/libgame.dylib
+#   tools/build.sh demo/main.bend demo/bin/libgame.dylib   # macOS
+#   tools/build.sh demo/main.bend demo/bin/libgame.so      # Linux
 #
 # Bend emits the whole program, its runtime and godot.c as one C file;
 # clang turns that file into the shared library Godot loads. The flags
