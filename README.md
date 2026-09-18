@@ -28,8 +28,8 @@ engine. Every Godot class has a generated Bend file of typed methods
 (14,931 of them, every one that is not virtual but three), over a dynamic core that calls any method by name, as
 GDScript's `obj.call(..)` does, and the program hears signals and input.
 There is a [Pong](pong/main.bend) written in it. Tested with Godot 4.6.3 on
-macOS (arm64), Linux (arm64 and, in CI, x86_64) and Android (arm64, on the
-emulator).
+macOS (arm64), Linux (arm64 and, in CI, x86_64), Android (arm64, on the
+emulator) and the iOS simulator; not yet on an iPhone.
 
 ## The typed API
 
@@ -225,6 +225,15 @@ normal Godot Android export then carries the library.
 builds it, exports a debug APK, runs it on the device or emulator `adb` sees,
 and prints its output.
 
+For iOS, `tools/build.sh demo/main.bend demo/bin/libgame.xcframework ios`
+makes a static library per slice, which is what iOS takes; Godot's iOS export
+links it into the app. The sprite demo runs in the simulator (as x86_64: the
+official 4.6 template's simulator slice has no arm64), and the exported
+project builds for a device. It has not run on a real iPhone yet, and that is
+where the open question is: the Bend runtime reserves at least 8 GiB of
+address space, plus 2 GiB per worker thread, which a phone may refuse without
+the extended virtual addressing entitlement.
+
 On Linux the library is a `.so`: `tools/build.sh demo/main.bend
 demo/bin/libgame.so`. `tools/linux.Dockerfile` runs the whole suite in a
 container, which is what CI does.
@@ -274,15 +283,18 @@ and runs it outside the engine, on the JS twins of the effects
       work inside Godot
 - [x] Linux
 - [x] Android (arm64)
-- [ ] iOS; Windows when Bend supports it
+- [x] iOS: builds, runs in the simulator
+- [ ] iOS on a device; Windows when Bend supports it
 - [ ] Several Bend programs per scene (today: one `BendRuntime`, one `main`)
 
 ## Known limits
 
 From how the Bend runtime is built today, and from what this binding has not done yet:
 
-- The runtime installs its own `SIGSEGV`/`SIGBUS` handlers and reserves up to
-  8 TiB of virtual address space, which iOS is unlikely to allow.
+- The runtime installs its own `SIGSEGV`/`SIGBUS` handlers, so a crash
+  anywhere in the process, Godot's included, reports as `bend: memory fault`.
+- It reserves up to 8 TiB of virtual address space (halving down to 8 GiB
+  when refused). Android takes that; an iPhone is untested.
 - A runtime failure calls `exit`, which takes the editor down with it.
 - Handles are released by hand (`Godot.drop`): nothing collects them.
 - Bend drops the effects a program never reaches, so `godot.c` registers each
