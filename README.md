@@ -3,6 +3,115 @@
 Write [Godot](https://godotengine.org) games in [Bend 2](https://bend-lang.com),
 the language with dependent types, proofs and automatic CPU/GPU parallelism.
 
+## Current problems
+
+Read this first. It is everything known to be missing, untested or fragile,
+kept here rather than spread through the text below.
+
+**Never tested**
+
+- **A real iPhone.** The demo runs in the simulator and the exported project
+  builds for a device, no more. The open question is address space, below.
+- **A real Android device.** Only the arm64 emulator (Android 16).
+- **Input by hand.** Nobody has played Pong with a keyboard: key and mouse
+  events were only fed synthetically (`Input.parse_input_event`) in a headless
+  run. Polling (`Input.is_key_pressed`) answers, which is all that is known.
+- **Bend's parallelism inside Godot.** No test uses a parallel let
+  (`a b = f(x) g(y)`), so the runtime's worker threads have never run under
+  the engine. The GPU mark (`f!(x)`) is not expected to build at all:
+  `tools/build.sh` does not pass the Objective-C and Metal/CUDA flags Bend's
+  own build uses for it.
+- **Performance.** Nothing is measured. Every call goes by name through a
+  stack of Variants and several effects; it is fine for Pong and unknown past
+  it.
+- **UDP and channels** directly (TCP, `IO.sleep`, `IO.fork`/`IO.join` are
+  tested), **GDScript calling into a program** (described below, by signal;
+  no test has a script in it), the **message for a too deep recursion**
+  (it could not be provoked: the runtime keeps continuations on its heap), and
+  a **runtime failure on a worker thread**.
+- Linux x86_64 runs only in CI; the iOS simulator only as x86_64.
+
+**What the binding cannot do yet**
+
+- **Override a virtual method.** A program cannot be `_draw`,
+  `_physics_process` or `_gui_input`: it gets `_ready` (its start), `_process`
+  (`Godot.frame()`) and `_input` (`Godot.listen`), and everything else by
+  signal. All 1,415 virtual methods are left out of the typed API.
+- **Integers past 32 bits.** A `VInt` is a 32-bit window in two's complement,
+  since Bend has no signed or 64-bit integer: a larger value from Godot is cut
+  (object ids are safe, they never reach the program).
+- **Floats are `F32`.** Godot's 64-bit floats lose precision on the way in.
+  A double-precision build of Godot is not supported at all: the numeric
+  structs are carried as runs of `f32`.
+- **Objects are one type.** Bend has no subtyping, so `Label.set_text` type
+  checks on a `Sprite2D`; the mistake shows at run time, as an error in
+  Godot's log and the type's zero as the answer.
+- **Errors are logged, not returned.** A missing method, a freed object, a bad
+  argument: Godot's log says so and the call answers `VNil`. There is no
+  `Result` to match on.
+- **Handles are released by hand** (`Godot.drop`). Nothing collects them, and
+  a held RefCounted stays alive until dropped.
+- **The signal queue is unbounded.** A program that connects signals, or
+  listens to input, and never calls `Godot.signals()` only grows it.
+- Three methods with a `Signal` argument are left out; a `Callable` that comes
+  *back* from Godot is a `VOther`; a packed array goes in as `VPacked` but
+  comes back as a plain `VArr`; arrays and dictionaries nest 32 deep, and pop
+  as `VOther` past that.
+- **One program per library**, and only the first node of its class to be
+  ready runs it. On iOS, where libraries are linked statically, that means one
+  program per app.
+- **No hot reload, nothing in the editor.** The program runs in the game only
+  (by design: it would move the scene being edited), and a change means
+  rebuilding the library and starting the game again.
+- The typed API is generated for Godot 4.6.3; another version needs
+  `tools/gen_api.py` run again. Building needs Bun and clang; Windows waits
+  for Bend to support it.
+
+**What comes from the Bend runtime**
+
+- **Address space.** It reserves 8 TB for its heap (never under 8 GB) and
+  2 GB per thread for the evaluator's stack. Address space, not memory, which
+  a desktop or Android gives away and iOS rations. Bend documents no CPU
+  option for it, so the shim makes the reservation itself when asked
+  (`BEND_HEAP_MB`, `BEND_STACK_MB`, `BEND_THREADS`; the `ios` target defaults
+  to 1024, 64 and 1). Measured on Pong, macOS: 8.0 TB reserved by default,
+  about 1 GB bounded, the same 115 MB resident; the suite passes at 1 GB and
+  at 640 MB, and about 400 MB of it is fixed cost. Bounded, the heap cannot
+  grow (a program that outgrows it stops with the runtime's out of memory),
+  and each worker thread past the first still reserves 2 GB, so iOS gets one
+  thread and no parallelism.
+- **It ends the process when it cannot go on.** The build redirects its
+  `_exit` into the shim, which ends the program and lets the game go on
+  (`tests/fail.bend`). From a worker thread there is nowhere to return to, and
+  the process does end.
+- **It takes `SIGSEGV` and `SIGBUS`.** The shim puts its own handler in front
+  and hands every fault to Godot's crash handler, so a crash keeps Godot's
+  backtrace.
+- **The binding lives on runtime internals.** `godot.c` is pasted into the one
+  C file Bend emits and calls `io_step`, `io_runs` and friends; it also
+  carries copies of three runtime functions with a parameter changed
+  (`io_wait` without the wait, `corpus_setup` and `pool_stack` with a size).
+  It is tied to the pinned Bend commit, and a bump means reading those again.
+- Bend drops the effects a program never reaches, and their `CID_` macros, so
+  each effect registers under `#ifdef`. There is no documented layout for a
+  user's datatype in foreign C, which is why values cross over a stack and
+  not as terms. An open `law` is allowed only in Base.
+- A large `Nat` literal (`400000000n`) hangs the Bend compiler; write
+  `U32.to_nat(400000000)`.
+- A sleep or a socket wakes on the next frame, so its resolution is a frame.
+
+**What comes from Godot**
+
+- The first headless `--import` of a project with any GDExtension crashes at
+  shutdown, after the import is done
+  ([godot#123511](https://github.com/godotengine/godot/issues/123511)). The
+  next run is clean.
+- The official 4.6.3 iOS template's simulator slice of `libgodot.a` has no
+  arm64, so the simulator build is x86_64. On iOS, `print` does not reach
+  `simctl`'s console.
+
+## What it looks like
+
 ```python
 import Base
 import ../godot/Godot.bend as Godot
@@ -25,11 +134,12 @@ def main() -> IO(Unit):
 **Status: early, and working.** A Bend program compiles into a GDExtension
 library, Godot loads it, and the program runs frame by frame inside the
 engine. Every Godot class has a generated Bend file of typed methods
-(14,931 of them, every one that is not virtual but three), over a dynamic core that calls any method by name, as
-GDScript's `obj.call(..)` does, and the program hears signals and input.
+(14,931 of them, every one that is not virtual but three), over a dynamic
+core that calls any method by name, as GDScript's `obj.call(..)` does, and the program hears signals and input.
 There is a [Pong](pong/main.bend) written in it. Tested with Godot 4.6.3 on
 macOS (arm64), Linux (arm64 and, in CI, x86_64), Android (arm64, on the
-emulator) and the iOS simulator; not yet on an iPhone.
+emulator) and the iOS simulator; not yet on an iPhone. See
+[Current problems](#current-problems).
 
 ## The typed API
 
@@ -248,14 +358,9 @@ links it into the app. The sprite demo runs in the simulator (as x86_64: the
 official 4.6 template's simulator slice has no arm64), and the exported
 project builds for a device. It has not run on a real iPhone yet.
 
-Left alone, the Bend runtime reserves 8 TB of address space for its heap
-(never under 8 GB) and 2 GB per thread for the evaluator's stack: address
-space, not memory, which a desktop or Android gives away and iOS rations. Bend
-documents no option for it on the CPU, so the shim takes the reservation into
-its own hands when asked: `BEND_HEAP_MB`, `BEND_STACK_MB` and `BEND_THREADS`
-at build time. The `ios` target defaults to 1024, 64 and 1. Measured on Pong
-(macOS): 8.0 TB reserved by default, about 1 GB bounded, the same 115 MB
-resident; the whole suite passes at 1 GB, and at 640 MB.
+The `ios` target bounds what the Bend runtime reserves (`BEND_HEAP_MB=1024`,
+`BEND_STACK_MB=64`, `BEND_THREADS=1` unless told otherwise); why is under
+[Current problems](#current-problems).
 
 On Linux the library is a `.so`: `tools/build.sh demo/main.bend
 demo/bin/libgame.so`. `tools/linux.Dockerfile` runs the whole suite in a
@@ -311,30 +416,6 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] iOS: builds, runs in the simulator
 - [ ] iOS on a device; Windows when Bend supports it
 - [x] Several Bend programs per scene, a library and a node class each
-
-## Known limits
-
-From how the Bend runtime is built today, and from what this binding has not done yet:
-
-- It reserves 8 TB of address space unless the build bounds it
-  (`BEND_HEAP_MB`, see iOS above). Bounded, the heap cannot grow: a program
-  that outgrows it stops with the runtime's out of memory. A worker thread
-  past the first still reserves the runtime's own 2 GB stack.
-- When the runtime cannot go on it ends the process. Inside Godot that is
-  turned into the end of the program only: `tools/build.sh` redirects the
-  runtime's `_exit` into the shim, which leaves the pump, logs an error in
-  Godot and lets the game go on (`tests/fail.bend`). From one of the runtime's
-  worker threads there is nowhere to return to, and the process does end.
-- The runtime takes over `SIGSEGV` and `SIGBUS`. The shim puts a handler of
-  its own in front, which hands every fault on to Godot's crash handler, so a
-  crash still comes with Godot's backtrace.
-- Handles are released by hand (`Godot.drop`): nothing collects them.
-- Bend drops the effects a program never reaches, so `godot.c` registers each
-  one under `#ifdef`; a new effect needs its line there.
-- The binding reaches into runtime internals (`io_step`, `io_runs`) and
-  carries a zero-timeout copy of the runtime's poller, so it is tied to the
-  pinned Bend commit and may need care on each bump.
-- A sleep or a socket wakes on the next frame, so its resolution is a frame.
 
 ## License
 
