@@ -324,10 +324,11 @@ static struct sigaction gd_old_bus;
 
 static void gd_fault(int sig, siginfo_t* info, void* ctx) {
   char* at   = (char*)info->si_addr;
-  char* deep = (char*)io_stk + (1ull << 31);
+  char* deep = (char*)io_stk
+    + (GD_STACK_MB > 0 ? (u64)GD_STACK_MB << 20 : 1ull << 31);
   if (io_stk != NULL && at >= deep && at < deep + 16384) {
     static const char text[] =
-      "bend: the program recursed past its 2 GiB stack\n";
+      "bend: the program recursed past its evaluator stack\n";
     (void)!write(2, text, sizeof text - 1);
   }
   struct sigaction* old = sig == SIGBUS ? &gd_old_bus : &gd_old_segv;
@@ -352,6 +353,69 @@ static void gd_faults(void) {
   sa.sa_flags     = SA_SIGINFO | SA_ONSTACK;
   sigaction(SIGSEGV, &sa, NULL);
   sigaction(SIGBUS, &sa, NULL);
+}
+
+// Memory
+// ------
+
+// Left alone, the runtime reserves 8 TB of address space for its heap
+// (halving when refused, but never under 8 GB), and 2 GB more for the
+// evaluator stack of every thread. Address space, not memory: pages fault
+// in on touch, and a desktop or Android gives it away. A system that
+// rations address space (iOS) may not. These build options take the
+// reservation into the shim's hands:
+//
+//   -DGD_HEAP_MB=1024   the corpus, heap and all (at least ~512)
+//   -DGD_STACK_MB=64    the pumping thread's evaluator stack
+//   -DGD_THREADS=1      worker threads; each still reserves the
+//                       runtime's own 2 GB stack, so 1 is the frugal one
+//
+// gd_setup and gd_eval_stack follow the runtime's corpus_setup (its CPU path)
+// and pool_stack line by line, with the sizes as parameters, so a Bend
+// bump may need them looked at. With GD_HEAP_MB unset nothing changes.
+#ifndef GD_HEAP_MB
+#define GD_HEAP_MB 0
+#endif
+#ifndef GD_STACK_MB
+#define GD_STACK_MB 0
+#endif
+#ifndef GD_THREADS
+#define GD_THREADS 0
+#endif
+
+static Corpus gd_setup(u64 bytes, long threads) {
+  io_gpu     = false;
+  KEEP_WORDS = CAP_WORDS;
+  u64 size   = bytes & ~16383ull;
+  CORPUS = pool_try(size);
+  if (CORPUS == MAP_FAILED) {
+    err_fail("reservation failed");
+  }
+  u64 span = size / 8;
+  u64 cap  = span > HEAP_OFF ? (span - HEAP_OFF) / (PAGE_LEN + 10) : 0;
+  if (cap <= CUBE) {
+    err_fail("GD_HEAP_MB is under the rings, stacks and a page per lane");
+  }
+  cap = cap < ~0u ? cap : ~0u - 1;
+  Corpus H = CORPUS;
+  memcpy(H + STAT_OFF, STAT_IMG, STAT_LEN * sizeof(u64));
+  u64 at = HEAP_OFF + (cap << PAGE_BITS);
+  for (u32 c = 0; c < NCLS_ALL; c += 1) {
+    bank_at(H, c)->off = at;
+    at += 2 * (cap >> ((c < NCLS ? NCLS : c) - PAGE_BITS));
+  }
+  a32_store(a32_at(H, H_BUMP), 1);
+  a32_store(a32_at(H, H_CAP), (u32)cap);
+  pool_size = threads < 1 ? 1 : threads < CUBE_T ? threads : CUBE_T;
+  return H;
+}
+
+static Term* gd_eval_stack(u64 len) {
+  char* p = pool_mmap(len + 16384);
+  if (mprotect(p + len, 16384, PROT_NONE) != 0) {
+    err_fail("stack guard failed");
+  }
+  return (Term*)p;
 }
 
 // Pump
@@ -457,9 +521,12 @@ static void gd_pump(void) {
 }
 
 static void gd_boot_raw(void) {
-  Corpus H = corpus_setup(false, cpu_count(), 0);
+  long   threads = GD_THREADS > 0 ? GD_THREADS : cpu_count();
+  Corpus H = GD_HEAP_MB > 0 ? gd_setup((u64)GD_HEAP_MB << 20, threads)
+    : corpus_setup(false, threads, 0);
   Env    e = { H, ALC[0] };
-  io_stk = pool_stack();
+  io_stk = GD_STACK_MB > 0 ? gd_eval_stack((u64)GD_STACK_MB << 20)
+    : pool_stack();
   signal(SIGPIPE, SIG_IGN);
   if (pipe(io_wake_fd) | fcntl(io_wake_fd[0], F_SETFL, O_NONBLOCK)) {
     err_fail("the event loop failed to open");

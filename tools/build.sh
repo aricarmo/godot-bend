@@ -14,6 +14,10 @@
 # A scene with several Bend programs needs a library each, and each its own
 # node class: BEND_CLASS=Enemy names it (the default is BendRuntime).
 #
+# BEND_HEAP_MB, BEND_STACK_MB and BEND_THREADS bound what the runtime
+# reserves (godot.c, Memory): by default 8 TB of address space and 2 GB per
+# thread, which a system that rations address space may refuse.
+#
 # The android target cross-compiles for arm64 with the NDK's clang, found
 # through ANDROID_NDK_HOME or as the newest NDK of the Android SDK. Bionic
 # keeps pthreads inside libc, so that one links without -lpthread.
@@ -34,6 +38,7 @@ C="${OUT%.*}.c"
 CLASS="-DGD_CLASS=\"${BEND_CLASS:-BendRuntime}\""
 # The runtime's fail-stop lands in godot.c instead of ending the process.
 TRAP="-D_exit(c)=gd_exit(c)"
+MEM="-DGD_HEAP_MB=${BEND_HEAP_MB:-0} -DGD_STACK_MB=${BEND_STACK_MB:-0} -DGD_THREADS=${BEND_THREADS:-0}"
 LIBS="-lpthread -lm"
 CC=${CC:-clang}
 if [ "$TARGET" = android ]; then
@@ -45,12 +50,15 @@ if [ "$TARGET" = android ]; then
 fi
 BEND_NO_TELEMETRY=1 bun "$ROOT/vendor/bend/bend2/main.ts" "$SRC" -o "$C"
 if [ "$TARGET" = ios ]; then
+  # iOS rations address space, so there the reservation is bounded unless
+  # told otherwise: 1 GB in all, a 64 MB evaluator stack, one thread.
+  MEM="-DGD_HEAP_MB=${BEND_HEAP_MB:-1024} -DGD_STACK_MB=${BEND_STACK_MB:-64} -DGD_THREADS=${BEND_THREADS:-1}"
   TMP=$(mktemp -d)
   trap 'rm -rf "$TMP"' EXIT
   slice() { # name, sdk, clang target
     mkdir -p "$TMP/$1"
     xcrun --sdk "$2" clang -target "$3" -std=c11 -O3 -fvisibility=hidden \
-      -Dmain=bend_cli_main "$CLASS" "$TRAP" -I "$ROOT/godot" -c "$C" \
+      -Dmain=bend_cli_main "$CLASS" "$TRAP" $MEM -I "$ROOT/godot" -c "$C" \
       -o "$TMP/$1/libgame.o"
     xcrun ar rcs "$TMP/$1/libgame.a" "$TMP/$1/libgame.o"
   }
@@ -67,5 +75,5 @@ if [ "$TARGET" = ios ]; then
   exit 0
 fi
 "$CC" -std=c11 -O3 -shared -fPIC -fvisibility=hidden -Dmain=bend_cli_main \
-  "$CLASS" "$TRAP" -I "$ROOT/godot" "$C" $LIBS -o "$OUT"
+  "$CLASS" "$TRAP" $MEM -I "$ROOT/godot" "$C" $LIBS -o "$OUT"
 echo "built $OUT"

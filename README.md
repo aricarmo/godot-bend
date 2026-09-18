@@ -246,10 +246,16 @@ For iOS, `tools/build.sh demo/main.bend demo/bin/libgame.xcframework ios`
 makes a static library per slice, which is what iOS takes; Godot's iOS export
 links it into the app. The sprite demo runs in the simulator (as x86_64: the
 official 4.6 template's simulator slice has no arm64), and the exported
-project builds for a device. It has not run on a real iPhone yet, and that is
-where the open question is: the Bend runtime reserves at least 8 GiB of
-address space, plus 2 GiB per worker thread, which a phone may refuse without
-the extended virtual addressing entitlement.
+project builds for a device. It has not run on a real iPhone yet.
+
+Left alone, the Bend runtime reserves 8 TB of address space for its heap
+(never under 8 GB) and 2 GB per thread for the evaluator's stack: address
+space, not memory, which a desktop or Android gives away and iOS rations. Bend
+documents no option for it on the CPU, so the shim takes the reservation into
+its own hands when asked: `BEND_HEAP_MB`, `BEND_STACK_MB` and `BEND_THREADS`
+at build time. The `ios` target defaults to 1024, 64 and 1. Measured on Pong
+(macOS): 8.0 TB reserved by default, about 1 GB bounded, the same 115 MB
+resident; the whole suite passes at 1 GB, and at 640 MB.
 
 On Linux the library is a `.so`: `tools/build.sh demo/main.bend
 demo/bin/libgame.so`. `tools/linux.Dockerfile` runs the whole suite in a
@@ -310,8 +316,10 @@ and runs it outside the engine, on the JS twins of the effects
 
 From how the Bend runtime is built today, and from what this binding has not done yet:
 
-- It reserves up to 8 TiB of virtual address space (halving down to 8 GiB
-  when refused). Android takes that; an iPhone is untested.
+- It reserves 8 TB of address space unless the build bounds it
+  (`BEND_HEAP_MB`, see iOS above). Bounded, the heap cannot grow: a program
+  that outgrows it stops with the runtime's out of memory. A worker thread
+  past the first still reserves the runtime's own 2 GB stack.
 - When the runtime cannot go on it ends the process. Inside Godot that is
   turned into the end of the program only: `tools/build.sh` redirects the
   runtime's `_exit` into the shim, which leaves the pump, logs an error in
