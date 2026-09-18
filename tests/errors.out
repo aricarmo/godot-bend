@@ -1,0 +1,13 @@
+ERROR: bend: no such method: no_such_method
+missing method: nil
+ERROR: bend: a call on null or on a freed object: get_name
+freed object: nil
+int: int 0
+bool: bool
+string name: str Bend
+object: obj
+array: other
+null object: nil
+ERROR: Failed to retrieve non-existent singleton 'NoSuchSingleton'.
+ERROR: bend: no singleton named NoSuchSingleton
+bend: done

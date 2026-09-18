@@ -9,14 +9,40 @@ import ../godot/Godot.bend as Godot
 
 def main() -> IO(Unit):
   do IO<Unit>:
-    Godot.print("hello from Bend, inside Godot")
+    +me : Godot.Object <- Godot.self()
+    loader : Godot.Object <- Godot.singleton("ResourceLoader")
+    texture : Godot.Variant <- Godot.call(loader, "load", [Godot.VStr{"res://icon.svg"}])
+    +sprite : Godot.Object <- Godot.new("Sprite2D")
+    Godot.set(sprite, "texture", texture)
+    added : Godot.Variant <- Godot.call(me, "add_child", [Godot.VObj{sprite}])
+    Godot.set(sprite, "position", Godot.VVec2{576.0, 324.0})
 ```
 
-**Status: a working proof of concept.** A Bend program compiles into a
-GDExtension library, Godot loads it, and the program runs frame by frame
-inside the engine. The Godot API it can reach is still two effects (`print`
-and `frame`). Everything else is the roadmap below. Tested with Godot 4.6.3
-on macOS arm64.
+**Status: early, and working.** A Bend program compiles into a GDExtension
+library, Godot loads it, and the program runs frame by frame inside the
+engine. It reaches the engine through a dynamic core: any method of any
+object by name, as GDScript's `obj.call(..)` does. Typed wrappers, signals
+and input are the roadmap below. Tested with Godot 4.6.3 on macOS arm64.
+
+## The API
+
+| | |
+|---|---|
+| `Godot.print(text)` | Godot's `print`: reaches the editor's Output panel |
+| `Godot.frame()` | Waits for the next frame; answers the delta in seconds (`F32`) |
+| `Godot.self()` | The `BendRuntime` node hosting the program: the way into the scene |
+| `Godot.singleton(name)` | `"Input"`, `"ResourceLoader"`, `"Engine"`, .. |
+| `Godot.new(class)` | A new object of any class |
+| `Godot.call(obj, method, args)` | Any method by name; answers a `Variant` |
+| `Godot.get(obj, property)` / `Godot.set(obj, property, value)` | Properties |
+| `Godot.node(from, path)` | A node by path, `VNil` when there is none |
+
+A `Variant` is `VNil`, `VBool`, `VInt` (the low 32 bits), `VFloat`, `VStr`
+(also what a `StringName` or `NodePath` arrives as), `VVec2`, `VObj`, or
+`VOther` for a kind not carried yet. An `Object` is a handle by instance id,
+never a pointer: it copies freely, and a call on a freed object logs an error
+in Godot and answers `VNil` instead of crashing. So does a method that does
+not exist.
 
 ## How it works
 
@@ -32,6 +58,12 @@ two fit without patching the compiler:
 2. The event loop is an interpreter of requests, and an effect may **park**
    its computation (`IO_PARK`) to be resumed later, which is how Bend's own
    channels and sockets wait.
+
+Values cross over a **stack of Godot Variants**, as in Lua's C API:
+`Godot.call` pushes each argument, calls, asks the kind of the result and pops
+it as that kind. Every raw effect then takes and answers only words, strings
+and numbers, so no Bend datatype's memory layout is part of the contract, and
+`Variant` itself is plain Bend code in `Godot.bend`.
 
 `Godot.frame()` is an effect that parks. The library registers a `BendRuntime`
 node: its `_ready` boots the Bend runtime and runs `main` until it parks on
@@ -60,11 +92,19 @@ godot --path demo --headless --quit-after 900
 
 ```
 hello from Bend, inside Godot
-131 frames in the last second
-145 frames in the last second
+sprite at (693.8248, 509.78833)
+sprite at (482.31235, 523.0543)
 ...
 bend: done
 ```
+
+Drop `--headless` to watch the sprite orbit. The very first headless
+`--import` of a project with any GDExtension crashes at shutdown, after the
+import is done; that is [godot#123511](https://github.com/godotengine/godot/issues/123511),
+not this binding, and the next run is clean.
+
+`GODOT=/path/to/godot tools/test.sh` runs `tests/*.bend` inside the engine
+and compares their output.
 
 `bun vendor/bend/bend2/main.ts demo/main.bend` type-checks the same program
 and runs it outside the engine, on the JS twins of the effects
@@ -80,17 +120,18 @@ and runs it outside the engine, on the JS twins of the effects
 | `godot/gdextension_interface.h` | Godot's C API, dumped from 4.6.3 |
 | `tools/build.sh` | `.bend` → `.c` → shared library |
 | `demo/` | A Godot project that runs `demo/main.bend` |
+| `tests/` | Programs run inside a headless Godot by `tools/test.sh` |
 | `vendor/bend` | The Bend compiler, pinned as a submodule |
 
 ## Roadmap
 
 - [x] Bend program loaded as a GDExtension, driven by `_process`
-- [ ] `Variant` as a Bend datatype, and objects as opaque handles
-- [ ] A dynamic core: `Godot.call(object, method, args)`, get/set property,
-      node lookup, instantiate
+- [x] `Variant` as a Bend datatype, and objects as safe handles
+- [x] A dynamic core: `Godot.call(object, method, args)`, get/set property,
+      node lookup, instantiate, singletons
+- [ ] More `Variant` kinds: Vector3, Color, arrays, dictionaries, 64-bit ints
 - [ ] Input and signals delivered to the program as events on `frame`
 - [ ] Typed wrappers generated from `extension_api.json` over the dynamic core
-- [ ] `F32` deltas (today `frame` answers microseconds as a `U32`)
 - [ ] A non-blocking poll in the pump, so `IO.sleep`, sockets and channels
       work inside Godot
 - [ ] Linux, then Android and iOS; Windows when Bend supports it
@@ -98,11 +139,15 @@ and runs it outside the engine, on the JS twins of the effects
 
 ## Known limits
 
-These come from how the Bend runtime is built today:
+From how the Bend runtime is built today, and from what this binding has not done yet:
 
 - The runtime installs its own `SIGSEGV`/`SIGBUS` handlers and reserves up to
   8 TiB of virtual address space, which iOS is unlikely to allow.
 - A runtime failure calls `exit`, which takes the editor down with it.
+- Object handles are never released: a program that creates objects without
+  end grows the handle table (and keeps every RefCounted it met alive).
+- Bend drops the effects a program never reaches, so `godot.c` registers each
+  one under `#ifdef`; a new effect needs its line there.
 - The binding reaches into runtime internals (`io_step`, `io_runs`), so it is
   tied to the pinned Bend commit and may need care on each bump.
 
