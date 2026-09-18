@@ -1,0 +1,7 @@
+vector3:  v3(1.5 2 3.25)
+color:  rgba(0.25 0.5 0.75 1)
+array:  [ 1 'two' [ 3.5 [ ] ] nil ]
+children:  [ obj obj ]
+minus one day:  '1969-12-31'
+minus one:  4294967295
+bend: done

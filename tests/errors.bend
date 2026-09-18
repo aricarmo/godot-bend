@@ -20,7 +20,7 @@ def kind(v: Godot.Variant) -> String:
       "vec2"
     case Godot.VObj{v}:
       "obj"
-    case Godot.VOther{}:
+    case other:
       "other"
 
 def say(label: String, v: Godot.Variant) -> IO(Unit):

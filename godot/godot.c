@@ -28,6 +28,7 @@ static GDExtensionInterfaceVariantNewNil                gd_var_nil;
 static GDExtensionInterfaceVariantNewCopy               gd_var_copy;
 static GDExtensionInterfaceVariantDestroy               gd_var_free;
 static GDExtensionInterfaceVariantCall                  gd_var_call;
+static GDExtensionInterfaceVariantConstruct             gd_var_make;
 static GDExtensionInterfaceVariantGetType               gd_var_type;
 static GDExtensionInterfaceVariantStringify             gd_var_text;
 static GDExtensionInterfaceClassdbConstructObject2      gd_construct;
@@ -47,20 +48,24 @@ static GDExtensionPtrUtilityFunction                    gd_util_error;
 typedef struct { void* p; }  GdName;
 typedef struct { void* p; }  GdStr;
 typedef struct { u64 w[3]; } GdVar;
-typedef struct { f32 x, y; } GdVec2;
+typedef struct { f32 x, y; }       GdVec2;
+typedef struct { f32 x, y, z; }    GdVec3;
+typedef struct { f32 r, g, b, a; } GdColor;
 typedef struct { u64 w[2]; } GdCall;
 
 // The kinds this binding carries, and Godot's constructors between each
 // and a Variant.
 enum {
-  GD_BOOL, GD_INT, GD_FLOAT, GD_STR, GD_VEC2, GD_OBJ, GD_CALL, GD_KINDS
+  GD_BOOL, GD_INT, GD_FLOAT, GD_STR, GD_VEC2, GD_OBJ, GD_CALL, GD_VEC3,
+  GD_COLOR, GD_KINDS
 };
 
 static const GDExtensionVariantType gd_types[GD_KINDS] = {
   GDEXTENSION_VARIANT_TYPE_BOOL,    GDEXTENSION_VARIANT_TYPE_INT,
   GDEXTENSION_VARIANT_TYPE_FLOAT,   GDEXTENSION_VARIANT_TYPE_STRING,
   GDEXTENSION_VARIANT_TYPE_VECTOR2, GDEXTENSION_VARIANT_TYPE_OBJECT,
-  GDEXTENSION_VARIANT_TYPE_CALLABLE,
+  GDEXTENSION_VARIANT_TYPE_CALLABLE, GDEXTENSION_VARIANT_TYPE_VECTOR3,
+  GDEXTENSION_VARIANT_TYPE_COLOR,
 };
 
 static GDExtensionVariantFromTypeConstructorFunc gd_from[GD_KINDS];
@@ -364,7 +369,7 @@ Term gd_push_bool_run(Env e, Term* f, IoWork* w) {
 }
 
 Term gd_push_int_run(Env e, Term* f, IoWork* w) {
-  int64_t v = (u32)f[0];
+  int64_t v = (int32_t)(u32)f[0];
   gd_from[GD_INT](gd_push(), &v);
   return GD_UNIT;
 }
@@ -390,6 +395,73 @@ Term gd_push_vec2_run(Env e, Term* f, IoWork* w) {
   GdVec2 v = { f32_unbox(f[0]), f32_unbox(f[1]) };
   gd_from[GD_VEC2](gd_push(), &v);
   return GD_UNIT;
+}
+
+Term gd_push_vec3_run(Env e, Term* f, IoWork* w) {
+  GdVec3 v = { f32_unbox(f[0]), f32_unbox(f[1]), f32_unbox(f[2]) };
+  gd_from[GD_VEC3](gd_push(), &v);
+  return GD_UNIT;
+}
+
+Term gd_push_color_run(Env e, Term* f, IoWork* w) {
+  GdColor v = { f32_unbox(f[0]), f32_unbox(f[1]), f32_unbox(f[2]),
+    f32_unbox(f[3]) };
+  gd_from[GD_COLOR](gd_push(), &v);
+  return GD_UNIT;
+}
+
+// A method of a Variant by name, for the few the arrays need. The result
+// is the caller's to free.
+static void gd_method(GdVar* self, const char* method, GdVar* arg,
+  GdVar* ret) {
+  GdName name = gd_name(method);
+  GDExtensionCallError err = { 0 };
+  GDExtensionConstVariantPtr args[1] = { arg };
+  gd_var_call(self, &name, args, arg == NULL ? 0 : 1, ret, &err);
+  gd_sn_free(&name);
+}
+
+// gd.array_new folds the top n values, pushed first to last, into one
+// Array.
+Term gd_array_new_run(Env e, Term* f, IoWork* w) {
+  u32 n = (u32)f[0];
+  if (n > gd_sp) {
+    err_fail("godot: an array of more items than the stack holds");
+  }
+  GdVar  arr;
+  GdVar* items = gd_stack + (gd_sp - n);
+  GDExtensionCallError err = { 0 };
+  gd_var_make(GDEXTENSION_VARIANT_TYPE_ARRAY, &arr, NULL, 0, &err);
+  for (u32 i = 0; i < n; i += 1) {
+    GdVar ret;
+    gd_method(&arr, "push_back", &items[i], &ret);
+    gd_var_free(&ret);
+    gd_var_free(&items[i]);
+  }
+  gd_sp -= n;
+  *gd_push() = arr;
+  return GD_UNIT;
+}
+
+// gd.array_open is its inverse: the items go on the stack first to last,
+// and the answer is how many.
+Term gd_array_open_run(Env e, Term* f, IoWork* w) {
+  GdVar   arr = *gd_top();
+  GdVar   ret;
+  int64_t n = 0;
+  gd_method(&arr, "size", NULL, &ret);
+  gd_into[GD_INT](&n, &ret);
+  gd_var_free(&ret);
+  for (int64_t i = 0; i < n; i += 1) {
+    GdVar at;
+    GdVar item;
+    gd_from[GD_INT](&at, &i);
+    gd_method(&arr, "get", &at, &item);
+    gd_var_free(&at);
+    *gd_push() = item;
+  }
+  gd_var_free(&arr);
+  return (Term)(u32)n;
 }
 
 Term gd_push_obj_run(Env e, Term* f, IoWork* w) {
@@ -458,7 +530,10 @@ Term gd_kind_run(Env e, Term* f, IoWork* w) {
     case GDEXTENSION_VARIANT_TYPE_NODE_PATH:   return 4;
     case GDEXTENSION_VARIANT_TYPE_VECTOR2:     return 5;
     case GDEXTENSION_VARIANT_TYPE_OBJECT:      return gd_slot_of(v) ? 6 : 0;
-    default:                                   return 7;
+    case GDEXTENSION_VARIANT_TYPE_VECTOR3:     return 7;
+    case GDEXTENSION_VARIANT_TYPE_COLOR:       return 8;
+    case GDEXTENSION_VARIANT_TYPE_ARRAY:       return 9;
+    default:                                   return 10;
   }
 }
 
@@ -511,6 +586,24 @@ Term gd_pop_vec2_run(Env e, Term* f, IoWork* w) {
   gd_into[GD_VEC2](&p, v);
   gd_var_free(v);
   return io_tup(e, f32_rewrap(p.x), f32_rewrap(p.y));
+}
+
+Term gd_pop_vec3_run(Env e, Term* f, IoWork* w) {
+  GdVar* v = gd_top();
+  GdVec3 p = { 0, 0, 0 };
+  gd_into[GD_VEC3](&p, v);
+  gd_var_free(v);
+  return io_tup(e, f32_rewrap(p.x),
+    io_tup(e, f32_rewrap(p.y), f32_rewrap(p.z)));
+}
+
+Term gd_pop_color_run(Env e, Term* f, IoWork* w) {
+  GdVar*  v = gd_top();
+  GdColor c = { 0, 0, 0, 0 };
+  gd_into[GD_COLOR](&c, v);
+  gd_var_free(v);
+  return io_tup(e, f32_rewrap(c.r), io_tup(e, f32_rewrap(c.g),
+    io_tup(e, f32_rewrap(c.b), f32_rewrap(c.a))));
 }
 
 Term gd_pop_obj_run(Env e, Term* f, IoWork* w) {
@@ -648,6 +741,24 @@ static void __attribute__((constructor)) gd_use(void) {
 #endif
 #ifdef CID_GD_POP_VEC2
   io_eff(CID_GD_POP_VEC2, gd_pop_vec2_run, 0);
+#endif
+#ifdef CID_GD_PUSH_VEC3
+  io_eff(CID_GD_PUSH_VEC3, gd_push_vec3_run, 0);
+#endif
+#ifdef CID_GD_PUSH_COLOR
+  io_eff(CID_GD_PUSH_COLOR, gd_push_color_run, 0);
+#endif
+#ifdef CID_GD_ARRAY_NEW
+  io_eff(CID_GD_ARRAY_NEW, gd_array_new_run, 0);
+#endif
+#ifdef CID_GD_ARRAY_OPEN
+  io_eff(CID_GD_ARRAY_OPEN, gd_array_open_run, 0);
+#endif
+#ifdef CID_GD_POP_VEC3
+  io_eff(CID_GD_POP_VEC3, gd_pop_vec3_run, 0);
+#endif
+#ifdef CID_GD_POP_COLOR
+  io_eff(CID_GD_POP_COLOR, gd_pop_color_run, 0);
 #endif
 #ifdef CID_GD_CONNECT
   io_eff(CID_GD_CONNECT, gd_connect_run, 0);
@@ -792,6 +903,8 @@ GDExtensionBool godot_bend_init(GDExtensionInterfaceGetProcAddress get,
     get("variant_destroy");
   gd_var_call     = (GDExtensionInterfaceVariantCall)
     get("variant_call");
+  gd_var_make     = (GDExtensionInterfaceVariantConstruct)
+    get("variant_construct");
   gd_var_type     = (GDExtensionInterfaceVariantGetType)
     get("variant_get_type");
   gd_var_text     = (GDExtensionInterfaceVariantStringify)

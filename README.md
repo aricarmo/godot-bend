@@ -40,12 +40,18 @@ value kinds are the roadmap below. Tested with Godot 4.6.3 on macOS arm64.
 | `Godot.connect(obj, signal, tag)` | Hears a signal, under a tag of your choosing |
 | `Godot.signals()` | The signals fired since the last ask, oldest first: `Signal{tag, args}` |
 
-A `Variant` is `VNil`, `VBool`, `VInt` (the low 32 bits), `VFloat`, `VStr`
-(also what a `StringName` or `NodePath` arrives as), `VVec2`, `VObj`, or
-`VOther` for a kind not carried yet. An `Object` is a handle by instance id,
-never a pointer: it copies freely, and a call on a freed object logs an error
-in Godot and answers `VNil` instead of crashing. So does a method that does
-not exist.
+A `Variant` is `VNil`, `VBool`, `VInt`, `VFloat`, `VStr` (also what a
+`StringName` or `NodePath` arrives as), `VVec2`, `VVec3`, `VColor`, `VArr`
+(a `List<&2, Variant>`, nested as deep as 32), `VObj`, or `VOther` for a kind
+not carried yet. Bend has no signed integer, so a `VInt` is a 32-bit window in
+two's complement: Godot's `-1` arrives as `4294967295`, and that goes back as
+`-1`. Lists of Variants are `List<&2, Variant>`, the copyable kind.
+
+An `Object` is a handle by instance id, never a pointer: it copies freely, and
+a call on a freed object logs an error in Godot and answers `VNil` instead of
+crashing. So does a method that does not exist.
+
+`Godot.bend` has no `@unsafe` def, so importing it keeps a program provable.
 
 Godot never calls into Bend. A signal may fire in the middle of a
 `Godot.call` the program is still inside, and a Bend program cannot be entered
@@ -153,7 +159,8 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] `Variant` as a Bend datatype, and objects as safe handles
 - [x] A dynamic core: `Godot.call(object, method, args)`, get/set property,
       node lookup, instantiate, singletons
-- [ ] More `Variant` kinds: Vector3, Color, arrays, dictionaries, 64-bit ints
+- [x] More `Variant` kinds: Vector3, Color, nested arrays, negative ints
+- [ ] Dictionaries, transforms, packed arrays, ints past 32 bits
 - [x] Signals delivered to the program as a queue; input by polling
 - [x] A game: Pong
 - [ ] `_input` events, and calls from GDScript into a running program

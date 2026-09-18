@@ -13,7 +13,7 @@ def arg(v: Godot.Variant) -> String:
     case other:
       "?"
 
-def args(vs: List<Godot.Variant>) -> String:
+def args(vs: List<&2, Godot.Variant>) -> String:
   match vs:
     case []:
       ""
@@ -24,7 +24,7 @@ def line(s: Godot.Signal) -> String:
   Godot.Signal{tag, vs} = s
   "signal " ++ U32.show(tag) ++ ":" ++ args(vs)
 
-def say(ss: List<Godot.Signal>) -> IO(Unit):
+def say(ss: List<&2, Godot.Signal>) -> IO(Unit):
   match ss:
     case []:
       IO.pure(Unit, Unit{})
@@ -35,7 +35,7 @@ def say(ss: List<Godot.Signal>) -> IO(Unit):
 
 # The frame's signals: none yet means wait on, through rest (a def cannot
 # name one defined below it).
-def tail(ss: List<Godot.Signal>, rest: IO(Unit)) -> IO(Unit):
+def tail(ss: List<&2, Godot.Signal>, rest: IO(Unit)) -> IO(Unit):
   match ss:
     case []:
       rest
@@ -52,7 +52,7 @@ def wait(fuel: Nat) -> IO(Unit):
     case 1n+p:
       do IO<Unit>:
         dt : F32 <- Godot.frame()
-        ss : List<Godot.Signal> <- Godot.signals()
+        ss : List<&2, Godot.Signal> <- Godot.signals()
         tail(ss, wait(p))
 
 def main() -> IO(Unit):
@@ -62,9 +62,9 @@ def main() -> IO(Unit):
     Godot.connect(me, "hit", 7)
     b : Godot.Variant <- Godot.call(me, "emit_signal", [Godot.VStr{"hit"}, Godot.VInt{42}, Godot.VStr{"left"}])
     c : Godot.Variant <- Godot.call(me, "emit_signal", [Godot.VStr{"hit"}, Godot.VInt{43}])
-    first : List<Godot.Signal> <- Godot.signals()
+    first : List<&2, Godot.Signal> <- Godot.signals()
     say(first)
-    none : List<Godot.Signal> <- Godot.signals()
+    none : List<&2, Godot.Signal> <- Godot.signals()
     say(none)
     Godot.connect(me, "no_such_signal", 9)
     +timer : Godot.Object <- Godot.new("Timer")

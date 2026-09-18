@@ -67,6 +67,24 @@ def gd.push_vec2(x: F32, y: F32) -> IO(Unit):
   import "./godot.c"
   import "./godot.js"
 
+def gd.push_vec3(x: F32, y: F32, z: F32) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
+def gd.push_color(r: F32, g: F32, b: F32, a: F32) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
+# Pops n values, pushed first to last, and pushes the Array of them.
+def gd.array_new(n: U32) -> IO(Unit):
+  import "./godot.c"
+  import "./godot.js"
+
+# Pops an Array, pushes its items first to last, and answers how many.
+def gd.array_open() -> IO(U32):
+  import "./godot.c"
+  import "./godot.js"
+
 def gd.push_obj(slot: U32) -> IO(Unit):
   import "./godot.c"
   import "./godot.js"
@@ -76,7 +94,7 @@ def gd.call(slot: U32, method: String, argc: U32) -> IO(Unit):
   import "./godot.js"
 
 # The top's kind: 0 Nil, 1 Bool, 2 Int, 3 Float, 4 String, 5 Vector2,
-# 6 Object, 7 anything else.
+# 6 Object, 7 Vector3, 8 Color, 9 Array, 10 anything else.
 def gd.kind() -> IO(Nat):
   import "./godot.c"
   import "./godot.js"
@@ -105,6 +123,14 @@ def gd.pop_vec2() -> IO(F32 & F32):
   import "./godot.c"
   import "./godot.js"
 
+def gd.pop_vec3() -> IO(F32 & F32 & F32):
+  import "./godot.c"
+  import "./godot.js"
+
+def gd.pop_color() -> IO(F32 & F32 & F32 & F32):
+  import "./godot.c"
+  import "./godot.js"
+
 def gd.pop_obj() -> IO(U32):
   import "./godot.c"
   import "./godot.js"
@@ -127,8 +153,10 @@ def gd.event() -> IO(U32):
 # Variant
 # -------
 
-# A Godot value. An Int is the low 32 bits of Godot's 64; Other is a kind
-# this binding does not carry yet (arrays, dictionaries, Vector3, ..).
+# A Godot value. Bend has no signed integer, so an Int is a 32-bit window
+# in two's complement: Godot's -1 arrives as 4294967295, and that goes back
+# as -1. Other is a kind this binding does not carry yet (dictionaries,
+# transforms, packed arrays, ..).
 type Variant is Data:
   VNil{}
   VBool{v: Bool}
@@ -136,6 +164,9 @@ type Variant is Data:
   VFloat{v: F32}
   VStr{v: String}
   VVec2{x: F32, y: F32}
+  VVec3{x: F32, y: F32, z: F32}
+  VColor{r: F32, g: F32, b: F32, a: F32}
+  VArr{items: List<&2, Variant>}
   VObj{v: Object}
   VOther{}
 
@@ -164,36 +195,72 @@ def Variant.vec2(p: F32 & F32) -> Variant:
   (x, y) = p
   VVec2{x, y}
 
-def Variant.push(v: Variant) -> IO(Unit):
-  match v:
-    case VNil{}:
-      gd.push_nil()
-    case VBool{v}:
-      gd.push_bool(Variant.bit(v))
-    case VInt{v}:
-      gd.push_int(v)
-    case VFloat{v}:
-      gd.push_float(v)
-    case VStr{v}:
-      gd.push_str(v)
-    case VVec2{x, y}:
-      gd.push_vec2(x, y)
-    case VObj{v}:
-      Object.push(v)
-    case VOther{}:
-      gd.push_nil()
+def Variant.vec3(p: F32 & F32 & F32) -> Variant:
+  (x, y, z) = p
+  VVec3{x, y, z}
 
-# Pushes every argument, first to last, and answers how many.
-def Variant.push_all(args: List<Variant>, n: U32) -> IO(U32):
-  match args:
+def Variant.color(p: F32 & F32 & F32 & F32) -> Variant:
+  (r, g, b, a) = p
+  VColor{r, g, b, a}
+
+# Pushes every value, first to last, and answers n plus how many. An
+# array's items go through the same def, since Bend has no mutual
+# recursion: they are pushed, then folded into one Array.
+def Variant.push_all(vs: List<&2, Variant>, n: U32) -> IO(U32):
+  match vs:
     case []:
       IO.pure(U32, n)
-    case v <> rest:
+    case VNil{} <> rest:
       do IO<U32>:
-        Variant.push(v)
+        gd.push_nil()
+        Variant.push_all(rest, (n + 1 : U32))
+    case VBool{v} <> rest:
+      do IO<U32>:
+        gd.push_bool(Variant.bit(v))
+        Variant.push_all(rest, (n + 1 : U32))
+    case VInt{v} <> rest:
+      do IO<U32>:
+        gd.push_int(v)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VFloat{v} <> rest:
+      do IO<U32>:
+        gd.push_float(v)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VStr{v} <> rest:
+      do IO<U32>:
+        gd.push_str(v)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VVec2{x, y} <> rest:
+      do IO<U32>:
+        gd.push_vec2(x, y)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VVec3{x, y, z} <> rest:
+      do IO<U32>:
+        gd.push_vec3(x, y, z)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VColor{r, g, b, a} <> rest:
+      do IO<U32>:
+        gd.push_color(r, g, b, a)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VArr{items} <> rest:
+      do IO<U32>:
+        k : U32 <- Variant.push_all(items, 0)
+        gd.array_new(k)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VObj{v} <> rest:
+      do IO<U32>:
+        Object.push(v)
+        Variant.push_all(rest, (n + 1 : U32))
+    case VOther{} <> rest:
+      do IO<U32>:
+        gd.push_nil()
         Variant.push_all(rest, (n + 1 : U32))
 
-def Variant.pop_as(kind: Nat) -> IO(Variant):
+# Pops the top as its kind. An array's items are popped by items, which is
+# Variant.pop_n one level down, handed in because a def cannot name one below it.
+def Variant.pop_as(
+  kind: Nat, items: Nat -> IO(List<&2, Variant>)
+) -> IO(Variant):
   match kind:
     case 0n:
       do IO<Variant>:
@@ -223,51 +290,86 @@ def Variant.pop_as(kind: Nat) -> IO(Variant):
       do IO<Variant>:
         v : Object <- Object.of(gd.pop_obj())
         return VObj{v}
+    case 7n:
+      do IO<Variant>:
+        p : F32 & F32 & F32 <- gd.pop_vec3()
+        return Variant.vec3(p)
+    case 8n:
+      do IO<Variant>:
+        p : F32 & F32 & F32 & F32 <- gd.pop_color()
+        return Variant.color(p)
+    case 9n:
+      do IO<Variant>:
+        n : U32 <- gd.array_open()
+        vs : List<&2, Variant> <- items(U32.to_nat(n))
+        return VArr{vs}
     case other:
       do IO<Variant>:
         gd.pop()
         return VOther{}
 
-def Variant.pop() -> IO(Variant):
-  do IO<Variant>:
-    kind : Nat <- gd.kind()
-    Variant.pop_as(kind)
+# At the nesting limit an array pops as Other.
+def Variant.flat(kind: Nat) -> Nat:
+  match kind:
+    case 9n:
+      10n
+    case other:
+      other
 
 # Pops n values pushed first to last: the top is the last, so each pop
-# conses onto the ones after it.
-def Variant.pop_n(n: Nat, acc: List<Variant>) -> IO(List<Variant>):
-  match n:
-    case 0n:
-      IO.pure(List<Variant>, acc)
-    case 1n+p:
-      do IO<List<Variant>>:
-        v : Variant <- Variant.pop()
-        Variant.pop_n(p, v <> acc)
+# conses onto the ones after it. depth bounds how far arrays nest (deeper
+# ones pop as Other), which is what lets the recursion pass the
+# termination check, and keeps a program that imports this file provable.
+def Variant.pop_n(+depth: Nat, n: Nat, acc: List<&2, Variant>) ->
+  IO(List<&2, Variant>):
+  match depth n:
+    case depth 0n:
+      IO.pure(List<&2, Variant>, acc)
+    case 0n 1n+p:
+      do IO<List<&2, Variant>>:
+        kind : Nat <- gd.kind()
+        v : Variant <- Variant.pop_as(Variant.flat(kind), k => IO.pure(List<&2, Variant>, []))
+        Variant.pop_n(0n, p, v <> acc)
+    case 1n+d 1n+p:
+      do IO<List<&2, Variant>>:
+        kind : Nat <- gd.kind()
+        v : Variant <- Variant.pop_as(kind, k => Variant.pop_n(d, k, []))
+        Variant.pop_n(1n+d, p, v <> acc)
+
+def Variant.first(vs: List<&2, Variant>) -> Variant:
+  match vs:
+    case []:
+      VNil{}
+    case v <> rest:
+      v
+
+def Variant.pop() -> IO(Variant):
+  do IO<Variant>:
+    vs : List<&2, Variant> <- Variant.pop_n(32n, 1n, [])
+    return Variant.first(vs)
 
 # Signal
 # ------
 
-# A signal that fired: the tag its connect chose, and what it carried. It
-# holds a plain List, which is affine, so a Signal is too (Type, not Data):
-# match it once.
-type Signal is Type:
-  Signal{tag: U32, args: List<Variant>}
+# A signal that fired: the tag its connect chose, and what it carried.
+type Signal is Data:
+  Signal{tag: U32, args: List<&2, Variant>}
 
 def Signal.next() -> IO(Signal):
   do IO<Signal>:
     tag : U32 <- gd.event()
     argc : U32 <- gd.pop_int()
-    args : List<Variant> <- Variant.pop_n(U32.to_nat(argc), [])
+    args : List<&2, Variant> <- Variant.pop_n(32n, U32.to_nat(argc), [])
     return Signal{tag, args}
 
-def Signal.take(n: Nat) -> IO(List<Signal>):
+def Signal.take(n: Nat) -> IO(List<&2, Signal>):
   match n:
     case 0n:
-      IO.pure(List<Signal>, [])
+      IO.pure(List<&2, Signal>, [])
     case 1n+p:
-      do IO<List<Signal>>:
+      do IO<List<&2, Signal>>:
         s : Signal <- Signal.next()
-        rest : List<Signal> <- Signal.take(p)
+        rest : List<&2, Signal> <- Signal.take(p)
         return s <> rest
 
 # API
@@ -296,7 +398,7 @@ def new(class: String) -> IO(Object):
   Object.of(gd.new(class))
 
 # Calls a method by name, as GDScript's obj.call(method, ..args) does.
-def call(obj: Object, method: String, args: List<Variant>) -> IO(Variant):
+def call(obj: Object, method: String, args: List<&2, Variant>) -> IO(Variant):
   do IO<Variant>:
     n : U32 <- Variant.push_all(args, 0)
     Object.call(obj, method, n)
@@ -323,7 +425,7 @@ def connect(obj: Object, signal: String, tag: U32) -> IO(Unit):
 
 # Every signal that fired since the last ask, oldest first. The natural
 # place to ask is right after frame().
-def signals() -> IO(List<Signal>):
-  do IO<List<Signal>>:
+def signals() -> IO(List<&2, Signal>):
+  do IO<List<&2, Signal>>:
     n : Nat <- gd.events()
     Signal.take(n)

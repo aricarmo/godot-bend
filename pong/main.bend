@@ -86,9 +86,12 @@ type Scene is Data:
   Scene{input: Godot.Object, left: Godot.Object, right: Godot.Object,
     ball: Godot.Object, score: Godot.Object}
 
-def rect(+me: Godot.Object, x: F32, y: F32, w: F32, h: F32) -> IO(Godot.Object):
+def rect(
+  +me: Godot.Object, x: F32, y: F32, w: F32, h: F32, ink: Godot.Variant
+) -> IO(Godot.Object):
   do IO<Godot.Object>:
     +r : Godot.Object <- Godot.new("ColorRect")
+    Godot.set(r, "color", ink)
     Godot.set(r, "size", Godot.VVec2{w, h})
     Godot.set(r, "position", Godot.VVec2{x, y})
     added : Godot.Variant <- Godot.call(me, "add_child", [Godot.VObj{r}])
@@ -184,9 +187,11 @@ def main() -> IO(Unit):
   do IO<Unit>:
     +me : Godot.Object <- Godot.self()
     input : Godot.Object <- Godot.singleton("Input")
-    left : Godot.Object <- rect(me, 32.0, 276.0, 16.0, 96.0)
-    right : Godot.Object <- rect(me, 1104.0, 276.0, 16.0, 96.0)
-    ball : Godot.Object <- rect(me, 568.0, 316.0, 16.0, 16.0)
+    server : Godot.Object <- Godot.singleton("RenderingServer")
+    cleared : Godot.Variant <- Godot.call(server, "set_default_clear_color", [Godot.VColor{0.07, 0.08, 0.11, 1.0}])
+    left : Godot.Object <- rect(me, 32.0, 276.0, 16.0, 96.0, Godot.VColor{0.49, 0.88, 0.63, 1.0})
+    right : Godot.Object <- rect(me, 1104.0, 276.0, 16.0, 96.0, Godot.VColor{0.96, 0.55, 0.45, 1.0})
+    ball : Godot.Object <- rect(me, 568.0, 316.0, 16.0, 16.0, Godot.VColor{0.95, 0.95, 0.9, 1.0})
     score : Godot.Object <- label(me)
     +sc : Scene = Scene{input, left, right, ball, score}
     tally(sc, 0, 0)

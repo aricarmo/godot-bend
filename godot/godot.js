@@ -44,6 +44,19 @@ function gd_push_float(v)    { return gd_put(3n, v); }
 function gd_push_str(v)      { return gd_put(4n, v); }
 function gd_push_vec2(x, y)  { return gd_put(5n, [x, y]); }
 function gd_push_obj(slot)   { return gd_put(6n, slot); }
+function gd_push_vec3(x, y, z)     { return gd_put(7n, [x, y, z]); }
+function gd_push_color(r, g, b, a) { return gd_put(8n, [r, g, b, a]); }
+
+function gd_array_new(n) {
+  const items = gd_stack.splice(gd_stack.length - Number(n));
+  return gd_put(9n, items);
+}
+
+function gd_array_open() {
+  const items = gd_take();
+  gd_stack.push(...items);
+  return items.length;
+}
 
 function gd_call(slot, method, argc) {
   gd_stack.length -= Number(argc);
@@ -65,6 +78,16 @@ function gd_pop_float() { return gd_take(); }
 function gd_pop_str()   { return gd_take(); }
 function gd_pop_vec2()  { const p = gd_take(); return io_tup(p[0], p[1]); }
 function gd_pop_obj()   { return gd_take(); }
+
+function gd_pop_vec3() {
+  const p = gd_take();
+  return io_tup(p[0], io_tup(p[1], p[2]));
+}
+
+function gd_pop_color() {
+  const c = gd_take();
+  return io_tup(c[0], io_tup(c[1], io_tup(c[2], c[3])));
+}
 
 // No engine, no signals: the queue stays empty.
 function gd_connect(slot, signal, tag) { return GD_UNIT; }
