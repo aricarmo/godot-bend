@@ -17,11 +17,9 @@ kept here rather than spread through the text below.
   and it polls (`Input.is_key_pressed`). The other way in, `Godot.listen`, has
   only seen key events fed synthetically (`Input.parse_input_event`) in a
   headless run, and never a mouse.
-- **Bend's parallelism inside Godot.** No test uses a parallel let
-  (`a b = f(x) g(y)`), so the runtime's worker threads have never run under
-  the engine. The GPU mark (`f!(x)`) is not expected to build at all:
+- **The GPU mark.** `f!(x)` is not expected to build at all:
   `tools/build.sh` does not pass the Objective-C and Metal/CUDA flags Bend's
-  own build uses for it.
+  own build uses for it. CPU parallelism does work, see below.
 - **Performance.** Nothing is measured. Every call goes by name through a
   stack of Variants and several effects; it is fine for Pong and unknown past
   it.
@@ -251,6 +249,18 @@ The handle table keeps every object a program meets, and keeps a RefCounted
 one alive, until `Godot.drop`. A handle carries its row's generation, so one
 kept past its drop names nothing, never the object that took the row.
 
+## Parallelism
+
+Bend's parallel calls (`a b = f(x) g(y)`) run on every core inside Godot, as
+they do in a native binary: the runtime's worker threads start within the
+engine's process the first time a program forks.
+[`bench/parallel.bend`](bench/parallel.bend) sums a balanced tree of 2^27
+leaves, forking at every level, from inside a Godot game. On an M1 Pro (10
+cores): 491 ms built with `BEND_THREADS=1`, 68 ms with all of them, 7.2 times
+faster. One measurement of one program, not a benchmark suite, and the GPU
+mark is untested (see Current problems). The work happens inside the frame
+that asks for it, so a long computation still stalls that frame.
+
 ## How it works
 
 A Bend binary expects to own its process: `main` builds an `IO` action and
@@ -390,6 +400,7 @@ and runs it outside the engine, on the JS twins of the effects
 | `demo/` | A Godot project that runs `demo/main.bend`: a sprite in orbit |
 | `pong/` | Pong: pure rules, a Godot scene built from Bend, keyboard input |
 | `tests/` | Programs run inside a headless Godot by `tools/test.sh` |
+| `bench/` | `parallel.bend`, a parallel sum timed inside Godot |
 | `vendor/bend` | The Bend compiler, pinned as a submodule |
 
 ## Roadmap
@@ -417,6 +428,8 @@ and runs it outside the engine, on the JS twins of the effects
 - [x] iOS: builds, runs in the simulator
 - [ ] iOS on a device; Windows when Bend supports it
 - [x] Several Bend programs per scene, a library and a node class each
+- [x] Bend's CPU parallelism verified under Godot
+- [ ] The GPU mark (`f!(x)`)
 
 ## License
 
