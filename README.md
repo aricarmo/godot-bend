@@ -13,9 +13,10 @@ kept here rather than spread through the text below.
 - **A real iPhone.** The demo runs in the simulator and the exported project
   builds for a device, no more. The open question is address space, below.
 - **A real Android device.** Only the arm64 emulator (Android 16).
-- **Input by hand.** Nobody has played Pong with a keyboard: key and mouse
-  events were only fed synthetically (`Input.parse_input_event`) in a headless
-  run. Polling (`Input.is_key_pressed`) answers, which is all that is known.
+- **Input events by hand.** Pong has been played on a real keyboard (macOS),
+  and it polls (`Input.is_key_pressed`). The other way in, `Godot.listen`, has
+  only seen key events fed synthetically (`Input.parse_input_event`) in a
+  headless run, and never a mouse.
 - **Bend's parallelism inside Godot.** No test uses a parallel let
   (`a b = f(x) g(y)`), so the runtime's worker threads have never run under
   the engine. The GPU mark (`f!(x)`) is not expected to build at all:
